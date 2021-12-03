@@ -43,6 +43,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
 import org.codeaurora.qmedia.CameraBase;
@@ -84,7 +85,7 @@ public class HomeFragment extends Fragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         mSettingData = new SettingsUtil(getActivity().getApplicationContext());
@@ -117,12 +118,12 @@ public class HomeFragment extends Fragment {
             }
         }
 
-        // Load Default layout for all other scenario e.g. HDMI In and Concurrent HDMI
+        // Load Default layout for all other scenario e.g. Camera, HDMI In and Concurrent HDMI
         return inflater.inflate(R.layout.primary_display, container, false);
     }
 
     @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         if (mSettingData.getHDMISource(0).equals("MP4")) {
             loadFileNames();
@@ -137,28 +138,21 @@ public class HomeFragment extends Fragment {
                 return;
             }
             mPrimaryDisplayButton = view.findViewById(R.id.primary_display_button);
-            mPrimaryDisplayButton.setOnClickListener((View v) -> {
-                processSecondaryDisplays();
-            });
+            mPrimaryDisplayButton.setOnClickListener((View v) -> processSecondaryDisplaysToggle());
         }
     }
 
     @Override
     public void onResume() {
+        Log.v(TAG, "Enter onResume");
         super.onResume();
-        if (mSettingData.getHDMISource(1).equals("None") &&
-                mSettingData.getHDMISource(2).equals("None")) {
-            return;
-        }
         Display[] displays = mDisplayManager.getDisplays(
                 DisplayManager.DISPLAY_CATEGORY_PRESENTATION);
         Log.d(TAG, "Number of display # " + displays.length);
 
         for (int it = 0; it < displays.length; it++) {
-            if (!mSettingData.getHDMISource(it + 1).equals("None")) {
-                mPresentationBaseList.add(new PresentationBase(getContext(), displays[it],
-                        mSettingData, it + 1));
-            }
+            mPresentationBaseList.add(new PresentationBase(getContext(), displays[it],
+                    mSettingData, it + 1));
         }
 
         for (PresentationBase it : mPresentationBaseList) {
@@ -168,6 +162,7 @@ public class HomeFragment extends Fragment {
                 mPresentationBaseList.remove(it);
             }
         }
+        Log.v(TAG, "Exit onResume");
     }
 
     @Override
@@ -191,16 +186,12 @@ public class HomeFragment extends Fragment {
             mPrimaryDisplayStarted = false;
             mPrimaryDisplayButton.setText("Start");
 
-            for (PresentationBase it : mPresentationBaseList) {
-                it.dismiss();
-            }
-
             if (mSettingData.getCameraID(0).equals("3")) {
                 if (mMediaCodecRecorder != null && mRecorderStarted) {
                     mMediaCodecRecorder.stop();
                     mRecorderStarted = false;
                 }
-                if(mHDMIinAudioPlayback!= null) {
+                if (mHDMIinAudioPlayback != null) {
                     mHDMIinAudioPlayback.stop();
                     mHDMIinAudioPlayback = null;
                 }
@@ -208,14 +199,16 @@ public class HomeFragment extends Fragment {
             // This will handle primary screen camera op
             if (mCameraBase != null) {
                 mCameraBase.closeCamera();
-                mPrimaryDisplayButton.setText("Start");
                 mCameraBase = null;
             }
+        }
+        for (PresentationBase it : mPresentationBaseList) {
+            it.dismiss();
         }
         Log.d(TAG, "Exit OnPause");
     }
 
-    private void processDecodeOperation() {
+    private void processDecodeAndSecondaryDisplaysToggle() {
         mPrimaryDisplayStarted = !mPrimaryDisplayStarted;
         if (mPrimaryDisplayStarted) {
 
@@ -246,7 +239,7 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    private void processCameraOperation() {
+    private void processCameraAndSecondaryDisplaysToggle() {
         mPrimaryDisplayStarted = !mPrimaryDisplayStarted;
         if (mCameraBase != null) {
             if (mPrimaryDisplayStarted) {
@@ -267,7 +260,7 @@ public class HomeFragment extends Fragment {
                         mMediaCodecRecorder.stop();
                         mRecorderStarted = false;
                     }
-                    if(mHDMIinAudioPlayback!= null) {
+                    if (mHDMIinAudioPlayback != null) {
                         mHDMIinAudioPlayback.stop();
                     }
                 }
@@ -283,9 +276,8 @@ public class HomeFragment extends Fragment {
 
     private void handleCamera(View view) {
         mPrimaryDisplayButton = view.findViewById(R.id.primary_display_button);
-        mPrimaryDisplayButton.setOnClickListener((View v) -> {
-            processCameraOperation();
-        });
+        mPrimaryDisplayButton
+                .setOnClickListener((View v) -> processCameraAndSecondaryDisplaysToggle());
         if (mSettingData.getCameraID(0).equals("3")) {
             mMediaCodecRecorder = new MediaCodecRecorder(getContext(), 3840, 2160, true);
             mHDMIinAudioPlayback = new HDMIinAudioPlayback(getContext());
@@ -315,9 +307,8 @@ public class HomeFragment extends Fragment {
 
     private void handleDecode(View view) {
         mPrimaryDisplayButton = view.findViewById(R.id.button_decode);
-        mPrimaryDisplayButton.setOnClickListener((View v) -> {
-            processDecodeOperation();
-        });
+        mPrimaryDisplayButton
+                .setOnClickListener((View v) -> processDecodeAndSecondaryDisplaysToggle());
         if (mSettingData.getComposeType(0).equals("OpenGLESWithEncode")) {
             Log.i(TAG, "OpenGLES with Encode is selected");
             mMediaCodecRecorder = new MediaCodecRecorder(getContext(), 1920, 1080, false);
@@ -467,7 +458,7 @@ public class HomeFragment extends Fragment {
     }
 
 
-    private void processSecondaryDisplays() {
+    private void processSecondaryDisplaysToggle() {
         mPrimaryDisplayStarted = !mPrimaryDisplayStarted;
         if (mPrimaryDisplayStarted) {
             for (PresentationBase it : mPresentationBaseList) {
