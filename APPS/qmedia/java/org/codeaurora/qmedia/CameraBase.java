@@ -130,6 +130,7 @@ public class CameraBase {
     private CameraCaptureSession mCaptureSession;
     private CaptureRequest.Builder mPreviewRequestBuilder;
     private SurfaceHolder mStreamSurfaceHolder = null;
+    private ArrayList<Surface> mStreamSurface = new ArrayList<>();
     private Surface mRecordSurface;
     private Boolean mRecord = false;
     private final CameraDisconnectedListener mCameraDisconnectedListener;
@@ -404,6 +405,10 @@ public class CameraBase {
         mStreamSurfaceHolder = surface;
     }
 
+    public void addPreviewStream(Surface surface) {
+        mStreamSurface.add(surface);
+    }
+
     public void enableReproc(ImageView view) {
         mEnableReproc = true;
         mImageView = view;
@@ -430,11 +435,24 @@ public class CameraBase {
             } catch (IllegalArgumentException e) {
                 Log.w(TAG, "Resource ByPass Key does not exist");
             }
-            List<Surface> outputs = new ArrayList<>();
+
+            List<OutputConfiguration> outConfigurations = new ArrayList<>();
             if (mStreamSurfaceHolder != null) {
                 mPreviewRequestBuilder.addTarget(mStreamSurfaceHolder.getSurface());
-                outputs.add(mStreamSurfaceHolder.getSurface());
+                outConfigurations.add(new OutputConfiguration(mStreamSurfaceHolder.getSurface()));
             }
+
+            if (mStreamSurface.size() > 0) {
+                OutputConfiguration sharedOutputConfig = new OutputConfiguration(mStreamSurface.get(0));
+                sharedOutputConfig.enableSurfaceSharing();
+                mPreviewRequestBuilder.addTarget(mStreamSurface.get(0));
+                for (int i = 1; i < mStreamSurface.size(); i++) {
+                    sharedOutputConfig.addSurface(mStreamSurface.get(i));
+                    mPreviewRequestBuilder.addTarget(mStreamSurface.get(i));
+                }
+                outConfigurations.add(sharedOutputConfig);
+            }
+
             if (mEnableReproc) {
                 if (mYUVImageReader == null) {
                     mYUVImageReader = ImageReader.newInstance(3840, 2160, ImageFormat.YUV_420_888, 8);
@@ -442,7 +460,7 @@ public class CameraBase {
                             .setOnImageAvailableListener(mYUVImageReaderListener, mImageListenerHandler);
                 }
                 mPreviewRequestBuilder.addTarget(mYUVImageReader.getSurface());
-                outputs.add(mYUVImageReader.getSurface());
+                outConfigurations.add(new OutputConfiguration(mYUVImageReader.getSurface()));
                 try {
                     mPreviewRequestBuilder.set(MULTI_ROI_ENABLE_KEY, (byte) 0x01);
                 } catch (IllegalArgumentException e) {
@@ -451,22 +469,18 @@ public class CameraBase {
             }
             if (mRecord && mRecordSurface != null) {
                 mPreviewRequestBuilder.addTarget(mRecordSurface);
-                outputs.add(mRecordSurface);
+                outConfigurations.add(new OutputConfiguration(mRecordSurface));
             }
             if (!mMLImageSurfaceList.isEmpty()) {
                 for (Surface surface : mMLImageSurfaceList) {
                     mPreviewRequestBuilder.addTarget(surface);
-                    outputs.add(surface);
+                    outConfigurations.add(new OutputConfiguration(surface));
                 }
             }
             if (!mSurfaceViewList.isEmpty()) {
                 for (SurfaceView view : mSurfaceViewList) {
-                    outputs.add(view.getHolder().getSurface());
+                    outConfigurations.add(new OutputConfiguration(view.getHolder().getSurface()));
                 }
-            }
-            List<OutputConfiguration> outConfigurations = new ArrayList<>(outputs.size());
-            for (Surface obj : outputs) {
-                outConfigurations.add(new OutputConfiguration(obj));
             }
 
             SessionConfiguration sessionCfg = new SessionConfiguration(

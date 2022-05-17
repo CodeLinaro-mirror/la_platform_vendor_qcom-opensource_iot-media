@@ -347,11 +347,12 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                     mCameraRunningStateSelected = true;
                     if (!mCameraRunning.getAndSet(true)) {
                         mCameraBase.startCamera(mSettingData.getCameraID(0));
+                        if (mMediaCodecRecorder != null) {
+                            Log.v(TAG, "Recorder start");
+                            mMediaCodecRecorder.start(0);
+                            mRecorderStarted = true;
+                        }
                         if (mSettingData.getIsHDMIinCameraEnabled(0)) {
-                            if (mMediaCodecRecorder != null) {
-                                mMediaCodecRecorder.start(0);
-                                mRecorderStarted = true;
-                            }
                             if (mHDMIinAudioPlayback != null) {
                                 mHDMIinAudioPlayback.start();
                             }
@@ -364,6 +365,10 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                 } else {
                     mCameraRunningStateSelected = false;
                     if (mCameraRunning.getAndSet(false)) {
+                        if (mMediaCodecRecorder != null && mRecorderStarted) {
+                            mMediaCodecRecorder.stop();
+                            mRecorderStarted = false;
+                        }
                         if (mSettingData.getIsHDMIinCameraEnabled(0)) {
                             if (mMediaCodecRecorder != null && mRecorderStarted) {
                                 mMediaCodecRecorder.stop();
@@ -594,12 +599,22 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                     manager.registerAvailabilityCallback(mAvailabilityCallback, mAvailabilityCallbackHandler);
                 } else {
                     mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
-                    mCameraBase.addPreviewStream(holder);
 
                     int width = mSettingData.getCameraWidth(0);
                     int height = mSettingData.getCameraHeight(0);
 
                     holder.setFixedSize(width, height);
+
+                    mCameraBase.addPreviewStream(holder.getSurface());
+
+                    if (mSettingData.getIsRecorderEnabled(0)) {
+                        mMediaCodecRecorder = new MediaCodecRecorder(mContext, width, height, false);
+
+                        VideoComposer mRecorderComposer =
+                            new VideoComposer(mMediaCodecRecorder.getRecorderSurface(),
+                            width, height, 30.0f, 0.0f, 1);
+                        mCameraBase.addPreviewStream(mRecorderComposer.getInputSurface(0));
+                    }
                 }
             }
 

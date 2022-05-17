@@ -126,6 +126,11 @@
             android:key="hdmi_1_reproc_enable"
             android:title="Reproc enable" />
 
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_1_recorder_enable"
+            android:title="Recorder enable" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="HDMI Out 2">
@@ -191,6 +196,11 @@
             android:key="hdmi_2_reproc_enable"
             android:title="Reproc enable" />
 
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_2_recorder_enable"
+            android:title="Recorder enable" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="HDMI Out 3">
@@ -255,6 +265,11 @@
             android:defaultValue="false"
             android:key="hdmi_3_reproc_enable"
             android:title="Reproc enable" />
+
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_3_recorder_enable"
+            android:title="Recorder enable" />
 
     </PreferenceCategory>
 

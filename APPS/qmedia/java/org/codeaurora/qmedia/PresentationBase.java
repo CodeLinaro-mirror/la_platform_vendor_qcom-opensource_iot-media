@@ -221,12 +221,22 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                         } else {
                             mCameraBase =
                                     new CameraBase(getContext(), mCameraDisconnectedListenerObject);
-                            mCameraBase.addPreviewStream(holder);
 
                             int width = mData.getCameraWidth(mPresentationIndex);
                             int height = mData.getCameraHeight(mPresentationIndex);
 
                             holder.setFixedSize(width, height);
+
+                            mCameraBase.addPreviewStream(holder.getSurface());
+
+                            if (mData.getIsRecorderEnabled(mPresentationIndex)) {
+                                mMediaCodecRecorder = new MediaCodecRecorder(getContext(), width, height, false);
+
+                                VideoComposer mRecorderComposer =
+                                    new VideoComposer(mMediaCodecRecorder.getRecorderSurface(),
+                                    width, height, 30.0f, 0.0f, 1);
+                                mCameraBase.addPreviewStream(mRecorderComposer.getInputSurface(0));
+                            }
                         }
                     }
 
