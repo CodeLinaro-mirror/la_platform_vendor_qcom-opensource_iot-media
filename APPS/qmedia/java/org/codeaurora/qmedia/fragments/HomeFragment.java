@@ -85,6 +85,8 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
+import android.media.MediaRecorder;
+import java.io.IOException;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -138,6 +140,7 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
     private Handler mAvailabilityCallbackHandler;
     private String mHDMIinCameraID = "";
     //private SnpeBase mSnpeBase = null;
+    private MediaRecorder mRecorder;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -218,6 +221,19 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
     public void onResume() {
         Log.v(TAG, "Enter onResume");
         super.onResume();
+
+        mRecorder = new MediaRecorder();
+        mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+        mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+        mRecorder.setOutputFile("/dev/null");
+        try {
+          mRecorder.prepare();
+        } catch (IOException e) {
+          Log.e("TAG", "failed to prepare MediaRecorder");
+        }
+        mRecorder.start();
+
         Display[] displays = mDisplayManager.getDisplays(
                 DisplayManager.DISPLAY_CATEGORY_PRESENTATION);
         Log.i(TAG, "Number of display # " + displays.length);
@@ -241,6 +257,9 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
     public void onPause() {
         Log.v(TAG, "Enter OnPause");
         super.onPause();
+        mRecorder.stop();
+        mRecorder.release();
+
         if (mPrimaryDisplayStarted) {
             mCameraRunningStateSelected = false;
             for (PresentationBase it : mPresentationBaseList) {
