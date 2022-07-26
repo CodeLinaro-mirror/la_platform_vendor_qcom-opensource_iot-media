@@ -1420,7 +1420,7 @@ void UmdCamera::SetDefaultControlValues(CameraMetadata& meta) {
     tag = GetVendorTagByName(
       "org.codeaurora.qcamera3.iso_exp_priority", "use_iso_exp_priority");
     if (tag != 0) {
-      int64_t isomode = 8; // ISO_MODE_MANUAL
+      int64_t isomode = 0; // QCAMERA3_ISO_MODE_AUTO
       meta.update(tag, &isomode, 1);
     }
   }
