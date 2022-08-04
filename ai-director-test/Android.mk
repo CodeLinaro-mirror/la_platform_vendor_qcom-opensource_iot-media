@@ -12,7 +12,7 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../umd-daemon/daemon
 
 LOCAL_SHARED_LIBRARIES := \
-    libqtiaidirector \
+    libqtiaidirectorwm \
     libcamera_adaptor \
     libcamera_memory_interface \
     libcamera_metadata \

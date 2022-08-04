@@ -444,7 +444,9 @@ public class CameraBase {
 
             if (mStreamSurface.size() > 0) {
                 OutputConfiguration sharedOutputConfig = new OutputConfiguration(mStreamSurface.get(0));
-                sharedOutputConfig.enableSurfaceSharing();
+                if (mStreamSurface.size() > 1) {
+                  sharedOutputConfig.enableSurfaceSharing();
+                }
                 mPreviewRequestBuilder.addTarget(mStreamSurface.get(0));
                 for (int i = 1; i < mStreamSurface.size(); i++) {
                     sharedOutputConfig.addSurface(mStreamSurface.get(i));
