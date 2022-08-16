@@ -236,6 +236,7 @@ void AIDirectorTest::transformVideoLoop() {
     ai_status_t res;
     ai_ctrl_buffer_t inbuf;
     ai_ctrl_buffer_t outbuf;
+    ai_ctrl_roi roi = {};
 
     if (mTransformVideoQueue.pop(buffer)) {
       UMD_LOG_ERROR("Video buffer timeout!\n");
@@ -304,7 +305,7 @@ void AIDirectorTest::transformVideoLoop() {
       goto fail_unmap_inbuf;
     }
 
-    res = ai_ctrl_transform(&inbuf, 1, &outbuf);
+    res = ai_ctrl_transform(&inbuf, 1, &outbuf, &roi);
     if (res != STATUS_OK) {
       UMD_LOG_ERROR("ai_ctrl_transform failed: %d\n", res);
     }

@@ -181,6 +181,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         SwitchPreference hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_1_hdmi_in_audio_enable");
         SwitchPreference hdmiin_video_enable = mPrefScreen.findPreference("hdmi_1_hdmi_in_video_enable");
         SwitchPreference reproc_enable = mPrefScreen.findPreference("hdmi_1_reproc_enable");
+        SwitchPreference recorder_enable = mPrefScreen.findPreference("hdmi_1_recorder_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -207,6 +208,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (reproc_enable.isVisible()) {
                 reproc_enable.setVisible(false);
             }
+            if (recorder_enable.isVisible()) {
+                recorder_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -225,11 +229,13 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 hdmiin_video_enable.setVisible(true);
                 reproc_enable.setVisible(false);
                 camera_size.setVisible(false);
+                recorder_enable.setVisible(false);
             } else {
                 hdmiin_audio_enable.setVisible(false);
                 hdmiin_video_enable.setVisible(false);
                 reproc_enable.setVisible(true);
                 camera_size.setVisible(true);
+                recorder_enable.setVisible(true);
             }
         } else if (hdmi_source.getValue().equals("SNPE")) {
             if (decoder_instance.isVisible()) {
@@ -265,6 +271,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             hdmiin_video_enable.setVisible(false);
             reproc_enable.setVisible(false);
             snpe_runtime.setVisible(false);
+            recorder_enable.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_2_source");
@@ -276,6 +283,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_2_hdmi_in_audio_enable");
         hdmiin_video_enable = mPrefScreen.findPreference("hdmi_2_hdmi_in_video_enable");
         reproc_enable = mPrefScreen.findPreference("hdmi_2_reproc_enable");
+        recorder_enable = mPrefScreen.findPreference("hdmi_2_recorder_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -302,6 +310,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (reproc_enable.isVisible()) {
                 reproc_enable.setVisible(false);
             }
+            if (recorder_enable.isVisible()) {
+                recorder_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -320,11 +331,13 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 hdmiin_video_enable.setVisible(true);
                 reproc_enable.setVisible(false);
                 camera_size.setVisible(false);
+                recorder_enable.setVisible(false);
             } else {
                 hdmiin_audio_enable.setVisible(false);
                 hdmiin_video_enable.setVisible(false);
                 reproc_enable.setVisible(true);
                 camera_size.setVisible(true);
+                recorder_enable.setVisible(true);
             }
         } else if (hdmi_source.getValue().equals("SNPE")) {
             if (decoder_instance.isVisible()) {
@@ -360,6 +373,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             reproc_enable.setVisible(false);
             camera_size.setVisible(false);
             snpe_runtime.setVisible(false);
+            recorder_enable.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_3_source");
@@ -371,6 +385,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         hdmiin_audio_enable = mPrefScreen.findPreference("hdmi_3_hdmi_in_audio_enable");
         hdmiin_video_enable = mPrefScreen.findPreference("hdmi_3_hdmi_in_video_enable");
         reproc_enable = mPrefScreen.findPreference("hdmi_3_reproc_enable");
+        recorder_enable = mPrefScreen.findPreference("hdmi_3_recorder_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -397,6 +412,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (reproc_enable.isVisible()) {
                 reproc_enable.setVisible(false);
             }
+            if (recorder_enable.isVisible()) {
+                recorder_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -415,11 +433,13 @@ public class SettingsFragment extends PreferenceFragmentCompat
                 hdmiin_video_enable.setVisible(true);
                 reproc_enable.setVisible(false);
                 camera_size.setVisible(false);
+                recorder_enable.setVisible(false);
             } else {
                 hdmiin_audio_enable.setVisible(false);
                 hdmiin_video_enable.setVisible(false);
                 reproc_enable.setVisible(true);
                 camera_size.setVisible(true);
+                recorder_enable.setVisible(true);
             }
         } else if (hdmi_source.getValue().equals("SNPE")) {
             if (decoder_instance.isVisible()) {
@@ -455,6 +475,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             reproc_enable.setVisible(false);
             camera_size.setVisible(false);
             snpe_runtime.setVisible(false);
+            recorder_enable.setVisible(false);
         }
 
         // Handle Reset App Preference
