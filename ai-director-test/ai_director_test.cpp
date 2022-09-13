@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -584,7 +584,7 @@ void AIDirectorTest::AIControlRoiCallback(void * usr_data, ai_ctrl_roi *roi) {
   UMD_LOG_INFO("%s\n", __func__);
 
   if (roi != nullptr) {
-    UMD_LOG_INFO("%s ROI top: %d, left:%d, bottom:%d, right:%d\n", __func__,
-        roi->top, roi->left, roi->bottom, roi->right);
+    UMD_LOG_INFO("%s ROI x:%d, y:%d, width:%d, height:%d\n", __func__,
+        roi->x, roi->y, roi->width, roi->height);
   }
 }
