@@ -67,6 +67,7 @@ import android.app.AlertDialog;
 import android.app.Presentation;
 import android.content.Context;
 import android.graphics.ImageFormat;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
@@ -122,10 +123,12 @@ public class PresentationBase extends Presentation implements CameraDisconnected
     private String mHDMIinCameraID = "";
     private final CameraDisconnectedListener mCameraDisconnectedListenerObject;
     private final Activity mActivity;
+    private Display mDisplay = null;
     //private SnpeBase mSnpeBase = null;
 
     public PresentationBase(Context outerContext, Display display, SettingsUtil data, int index, Activity activity) {
         super(outerContext, display);
+        this.mDisplay = display;
         this.mData = data;
         this.mPresentationIndex = index;
         mActivity = activity;
@@ -228,7 +231,12 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                             holder.setFixedSize(width, height);
 
                             mCameraBase.addPreviewStream(holder.getSurface());
-
+                            // CSI - DSI Tunneling
+                            if (mData.getIsTunnelingEnabled(mPresentationIndex)) {
+                                Rect displaySize = new Rect();
+                                mDisplay.getRectSize(displaySize);
+                                mCameraBase.enableTunneling(displaySize, mDisplay.getDisplayId());
+                            }
                             if (mData.getIsRecorderEnabled(mPresentationIndex)) {
                                 mMediaCodecRecorder = new MediaCodecRecorder(getContext(), width, height, false);
 
@@ -299,6 +307,12 @@ public class PresentationBase extends Presentation implements CameraDisconnected
                             });
                             mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                             mCameraBase.addPreviewStream(mHDMIinSurfaceHolder);
+                            // CSI -DSI tunneling
+                            if (mData.getIsTunnelingEnabled(mPresentationIndex)) {
+                                Rect displaySize = new Rect();
+                                mDisplay.getRectSize(displaySize);
+                                mCameraBase.enableTunneling(displaySize, mDisplay.getDisplayId());
+                            }
                             if (mData.getIsHDMIinVideoEnabled(mPresentationIndex)) {
                                 mMediaCodecRecorder = new MediaCodecRecorder(getContext(),
                                         resolution[0].getWidth(),

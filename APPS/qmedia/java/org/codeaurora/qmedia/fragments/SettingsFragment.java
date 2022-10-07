@@ -182,6 +182,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         SwitchPreference hdmiin_video_enable = mPrefScreen.findPreference("hdmi_1_hdmi_in_video_enable");
         SwitchPreference reproc_enable = mPrefScreen.findPreference("hdmi_1_reproc_enable");
         SwitchPreference recorder_enable = mPrefScreen.findPreference("hdmi_1_recorder_enable");
+        SwitchPreference tunneling_enable = mPrefScreen.findPreference("hdmi_1_tunneling_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -211,6 +212,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (recorder_enable.isVisible()) {
                 recorder_enable.setVisible(false);
             }
+            if (tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -223,6 +227,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             }
             if (snpe_runtime.isVisible()) {
                 snpe_runtime.setVisible(false);
+            }
+            if (!tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(true);
             }
             if (camera_id.getValue().equals(mHDMIinCameraID)) {
                 hdmiin_audio_enable.setVisible(true);
@@ -262,6 +269,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (reproc_enable.isVisible()) {
                 reproc_enable.setVisible(false);
             }
+            if (tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(false);
+            }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
@@ -272,6 +282,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             reproc_enable.setVisible(false);
             snpe_runtime.setVisible(false);
             recorder_enable.setVisible(false);
+            tunneling_enable.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_2_source");
@@ -284,6 +295,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         hdmiin_video_enable = mPrefScreen.findPreference("hdmi_2_hdmi_in_video_enable");
         reproc_enable = mPrefScreen.findPreference("hdmi_2_reproc_enable");
         recorder_enable = mPrefScreen.findPreference("hdmi_2_recorder_enable");
+        tunneling_enable = mPrefScreen.findPreference("hdmi_2_tunneling_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -313,6 +325,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (recorder_enable.isVisible()) {
                 recorder_enable.setVisible(false);
             }
+            if (tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -325,6 +340,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             }
             if (snpe_runtime.isVisible()) {
                 snpe_runtime.setVisible(false);
+            }
+            if (!tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(true);
             }
             if (camera_id.getValue().equals(mHDMIinCameraID)) {
                 hdmiin_audio_enable.setVisible(true);
@@ -364,6 +382,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (reproc_enable.isVisible()) {
                 reproc_enable.setVisible(false);
             }
+            if (tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(false);
+            }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
@@ -374,6 +395,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             camera_size.setVisible(false);
             snpe_runtime.setVisible(false);
             recorder_enable.setVisible(false);
+            tunneling_enable.setVisible(false);
         }
 
         hdmi_source = mPrefScreen.findPreference("hdmi_3_source");
@@ -386,6 +408,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
         hdmiin_video_enable = mPrefScreen.findPreference("hdmi_3_hdmi_in_video_enable");
         reproc_enable = mPrefScreen.findPreference("hdmi_3_reproc_enable");
         recorder_enable = mPrefScreen.findPreference("hdmi_3_recorder_enable");
+        tunneling_enable = mPrefScreen.findPreference("hdmi_3_tunneling_enable");
 
         if (hdmi_source.getValue().equals("MP4")) {
             if (!decoder_instance.isVisible()) {
@@ -415,6 +438,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (recorder_enable.isVisible()) {
                 recorder_enable.setVisible(false);
             }
+            if (tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(false);
+            }
         } else if (hdmi_source.getValue().equals("Camera")) {
             if (decoder_instance.isVisible()) {
                 decoder_instance.setVisible(false);
@@ -427,6 +453,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             }
             if (snpe_runtime.isVisible()) {
                 snpe_runtime.setVisible(false);
+            }
+            if (!tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(true);
             }
             if (camera_id.getValue().equals(mHDMIinCameraID)) {
                 hdmiin_audio_enable.setVisible(true);
@@ -466,6 +495,9 @@ public class SettingsFragment extends PreferenceFragmentCompat
             if (reproc_enable.isVisible()) {
                 reproc_enable.setVisible(false);
             }
+            if (tunneling_enable.isVisible()) {
+                tunneling_enable.setVisible(false);
+            }
         } else {
             decoder_instance.setVisible(false);
             compose_view.setVisible(false);
@@ -476,6 +508,7 @@ public class SettingsFragment extends PreferenceFragmentCompat
             camera_size.setVisible(false);
             snpe_runtime.setVisible(false);
             recorder_enable.setVisible(false);
+            tunneling_enable.setVisible(false);
         }
 
         // Handle Reset App Preference
