@@ -112,6 +112,7 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
 UmdCamera::~UmdCamera() {
 
   mMsg.push(UmdCameraMessage::CAMERA_TERMINATE);
+  mActive = false;
 
   if (mCameraThread) {
     mCameraThread->join();
