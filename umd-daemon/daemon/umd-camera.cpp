@@ -74,6 +74,12 @@
 #define JPEG_BLOB_OFFSET (0)
 #endif
 
+#define UMD_VIDEO_CTRL_GET_PAN(X)    (((int32_t *)(&(X)))[0] / 3600)
+#define UMD_VIDEO_CTRL_GET_TILT(X)   (((int32_t *)(&(X)))[1] / 3600)
+#define UMD_VIDEO_CTRL_SET_PAN_AND_TILT(P, T) \
+    ((((signed long)(P) * 3600) & 0xFFFFFFFF) | \
+    ((((signed long)(T) * 3600) & 0xFFFFFFFF) << 32))
+
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
 const uint32_t STREAM_BUFFER_COUNT = 4;
@@ -83,7 +89,7 @@ const uint32_t AUDIO_RECORDER_PERIOD_COUNT = 4;
 const uint32_t AUDIO_RECORDER_NUM_CHANNELS = 2;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 
-umd_pan_tilt_t UmdCamera::umd_current_pan_and_tilt = 0;
+uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
 
 UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev, int cameraId)
   : mGadget(nullptr),
@@ -112,6 +118,7 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
 UmdCamera::~UmdCamera() {
 
   mMsg.push(UmdCameraMessage::CAMERA_TERMINATE);
+  mActive = false;
 
   if (mCameraThread) {
     mCameraThread->join();
@@ -627,7 +634,7 @@ bool UmdCamera::GetFocusMode(CameraMetadata & meta, uint8_t * value) {
 }
 
 void UmdCamera::SetZoom(CameraMetadata& meta, uint16_t* in_magnification,
-  umd_pan_tilt_t* pan_and_tilt, UVCControlValues& ctrl_vals) {
+  uint64_t* pan_and_tilt, UVCControlValues& ctrl_vals) {
 
   int32_t sensor_x = 0, sensor_y = 0, sensor_w = 0, sensor_h = 0;
   int32_t zoom[4] = { 0 };
@@ -664,16 +671,16 @@ void UmdCamera::SetZoom(CameraMetadata& meta, uint16_t* in_magnification,
   int32_t zoom_w = (sensor_w - sensor_x) / (magnification / 100.0);
   int32_t zoom_h = (sensor_h - sensor_y) / (magnification / 100.0);
 
-  umd_pan_tilt_t pan_min = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_min);
-  umd_pan_tilt_t pan_max = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_max);
+  uint64_t pan_min = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_min);
+  uint64_t pan_max = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_max);
 
   float pan_steps = (pan_max - pan_min) / 2.0;
 
   int32_t zoom_x = ((sensor_w - sensor_x) - zoom_w) / 2;
   zoom_x += (zoom_x * pan) / pan_steps;
 
-  umd_pan_tilt_t tilt_min = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_min);
-  umd_pan_tilt_t tilt_max = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_max);
+  uint64_t tilt_min = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_min);
+  uint64_t tilt_max = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_max);
   float tilt_steps = (tilt_max - tilt_min) / 2.0;
 
   int32_t zoom_y = ((sensor_h - sensor_y) - zoom_h) / 2;
@@ -731,7 +738,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
 
   switch (id) {
   case UMD_VIDEO_CTRL_BRIGHTNESS: {
-    umd_brightness_t* value = (umd_brightness_t*)payload;
+    int16_t* value = (int16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetExposureCompensation(metadata, *value);
@@ -755,7 +762,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_CONTRAST: {
-    umd_contrast_t* value = (umd_contrast_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetContrast(metadata, *value);
@@ -779,7 +786,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_SATURATION: {
-    umd_saturation_t* value = (umd_saturation_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetSaturation(metadata, *value);
@@ -803,7 +810,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_SHARPNESS: {
-    umd_sharpness_t* value = (umd_sharpness_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetSharpness(metadata, *value);
@@ -827,7 +834,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_BACKLIGHT_COMPENSATION: {
-    umd_backlight_comp_t* value = (umd_backlight_comp_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetADRC(metadata, *value);
@@ -851,7 +858,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_ANTIBANDING: {
-    umd_antibanding_t* value = (umd_antibanding_t*)payload;
+    uint8_t* value = (uint8_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetAntibanding(metadata, *value);
@@ -878,7 +885,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_GAIN: {
-    umd_gain_t* value = (umd_gain_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetISO(metadata, *value);
@@ -902,7 +909,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_WB_TEMPERTURE: {
-    umd_wb_temp_t* value = (umd_wb_temp_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetWbTemperature(metadata, *value);
@@ -929,7 +936,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_WB_MODE: {
-    umd_wb_mode_t* value = (umd_wb_mode_t*)payload;
+    uint8_t* value = (uint8_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetWbMode(metadata, *value);
@@ -950,7 +957,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_EXPOSURE_TIME: {
-    umd_exp_time_t* value = (umd_exp_time_t*)payload;
+    uint32_t* value = (uint32_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetExposureTime(metadata, *value);
@@ -974,7 +981,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_EXPOSURE_MODE: {
-    umd_exp_mode_t* value = (umd_exp_mode_t*)payload;
+    uint8_t* value = (uint8_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetExposureMode(metadata, *value);
@@ -995,7 +1002,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_EXPOSURE_PRIORITY: {
-    umd_exp_priority_t* value = (umd_exp_priority_t*)payload;
+    uint8_t* value = (uint8_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       if (*value == UMD_VIDEO_EXPOSURE_PRIORITY_CONSTANT) {
@@ -1012,7 +1019,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_FOCUS_MODE: {
-    umd_exp_focus_mode_t* value = (umd_exp_focus_mode_t*)payload;
+    uint8_t* value = (uint8_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetFocusMode(metadata, *value);
@@ -1033,7 +1040,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_ZOOM: {
-    umd_zoom_t* value = (umd_zoom_t*)payload;
+    uint16_t* value = (uint16_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetZoom(metadata, value, NULL, ctx->mCtrlValues);
@@ -1057,7 +1064,7 @@ bool UmdCamera::handleVideoControl(uint32_t id, uint32_t request,
     break;
   }
   case UMD_VIDEO_CTRL_PANTILT: {
-    umd_pan_tilt_t* value = (umd_pan_tilt_t*)payload;
+    uint64_t* value = (uint64_t*)payload;
     switch (request) {
     case UMD_CTRL_SET_REQUEST:
       ctx->SetZoom(metadata, NULL, value, ctx->mCtrlValues);

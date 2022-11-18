@@ -67,6 +67,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
@@ -95,6 +96,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
@@ -121,6 +123,32 @@ public class CameraBase {
             new CaptureRequest.Key<Integer>(
                     "com.qti.camera.multiROIinfo.streamROICount",
                     Integer.class);
+    //CSI-DSI tunneling
+    private static final CaptureRequest.Key<Integer> TUNNEL_BLEND_MODE =
+            new CaptureRequest.Key<Integer>(
+                    "org.codeaurora.qcamera3.sessionParameters.TunnellingBlendingMode",
+                    Integer.class);
+    private static final CaptureRequest.Key<Integer> TUNNEL_PLANE_ALPHA =
+            new CaptureRequest.Key<Integer>(
+                    "org.codeaurora.qcamera3.sessionParameters.TunnellingPlaneAlpha",
+                    Integer.class);
+    private static final CaptureRequest.Key<Integer> TUNNEL_Z_ORDER =
+            new CaptureRequest.Key<Integer>(
+                    "org.codeaurora.qcamera3.sessionParameters.TunnellingZOrder",
+                    Integer.class);
+    private static final CaptureRequest.Key<Integer> TUNNEL_LAYER_TRANSFORM =
+            new CaptureRequest.Key<Integer>(
+                    "org.codeaurora.qcamera3.sessionParameters.TunnellingLayerTransform",
+                    Integer.class);
+    private static final CaptureRequest.Key<int[]> TUNNEL_DEST_RECT =
+            new CaptureRequest.Key<int[]>(
+                    "org.codeaurora.qcamera3.sessionParameters.TunnellingDestRect",
+                    int[].class);
+    private static final CaptureRequest.Key<Integer> TUNNEL_DISPLAY_ID =
+            new CaptureRequest.Key<Integer>(
+                    "org.codeaurora.qcamera3.sessionParameters.DisplayID",
+                    Integer.class);
+
     private static final int CHANGE_ROI_DATA_NTH_FRAME = 300;
     private final Context mCameraContext;
     private final Semaphore mCameraOpenCloseLock = new Semaphore(1);
@@ -153,6 +181,10 @@ public class CameraBase {
     private long mInitialTime;
     private Range<Integer> mFPSRange = new Range(30, 30);
     private ArrayList<Surface> mMLImageSurfaceList = new ArrayList<>();
+    // CSI-DSI Tunneling
+    private boolean mEnableTunneling;
+    private Rect mRectParams;
+    private int mDisplayID;
 
     public CameraBase(Context context, CameraDisconnectedListener cameraDisconnectedListener) {
         mCameraContext = context;
@@ -435,6 +467,44 @@ public class CameraBase {
             } catch (IllegalArgumentException e) {
                 Log.w(TAG, "Resource ByPass Key does not exist");
             }
+            // CSI - DSI Tunneling
+            if (mEnableTunneling) {
+                Log.i(TAG, "Tunneling is enabled");
+                try {
+                    //BLEND_MODE_PREMULTIPLIED
+                    mPreviewRequestBuilder.set(TUNNEL_BLEND_MODE, 2);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Tunnel Blend Mode Key does not exist");
+                }
+                try {
+                    mPreviewRequestBuilder.set(TUNNEL_PLANE_ALPHA, 1);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Tunnel Plane Alpha Key does not exist");
+                }
+                try {
+                    mPreviewRequestBuilder.set(TUNNEL_Z_ORDER, 2048);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Tunnel Z Order Key does not exist");
+                }
+                try {
+                    mPreviewRequestBuilder.set(TUNNEL_LAYER_TRANSFORM, 3);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Tunnel Layer Transform Key does not exist");
+                }
+                try {
+                    int[] rectArr = {mRectParams.left,mRectParams.top,mRectParams.right,
+                            mRectParams.bottom};
+                    Log.v(TAG, "Coordinates for tunneling # "+ Arrays.toString(rectArr));
+                    mPreviewRequestBuilder.set(TUNNEL_DEST_RECT, rectArr);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Tunnel Dest Rect Key does not exist");
+                }
+                try {
+                    mPreviewRequestBuilder.set(TUNNEL_DISPLAY_ID, mDisplayID);
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Tunnel Display ID Key does not exist");
+                }
+            }
 
             List<OutputConfiguration> outConfigurations = new ArrayList<>();
             if (mStreamSurfaceHolder != null) {
@@ -581,6 +651,13 @@ public class CameraBase {
                 }
             }
         }
+    }
+
+    public void enableTunneling(Rect rectParams, int displayID) {
+        mEnableTunneling = true;
+        mRectParams = rectParams;
+        mDisplayID = displayID;
+        Log.i(TAG, "Tunnel Mode On: Display Id # " + mDisplayID + "Display Size # " + mRectParams);
     }
 }
 

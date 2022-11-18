@@ -87,6 +87,7 @@ class SettingsData {
     protected Boolean isHDMIinVideoEnabled;
     protected Boolean isReprocEnabled;
     protected Boolean isRecorderEnabled;
+    protected Boolean isTunnelingEnabled;
 }
 
 public class SettingsUtil {
@@ -141,6 +142,7 @@ public class SettingsUtil {
         hdmi_1_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_1_hdmi_in_video_enable", false);
         hdmi_1_setting.isReprocEnabled = pref.getBoolean("hdmi_1_reproc_enable", false);
         hdmi_1_setting.isRecorderEnabled = pref.getBoolean("hdmi_1_recorder_enable", false);
+        hdmi_1_setting.isTunnelingEnabled = pref.getBoolean("hdmi_1_tunneling_enable", false);
         data.add(hdmi_1_setting);
 
         SettingsData hdmi_2_setting = new SettingsData();
@@ -180,6 +182,7 @@ public class SettingsUtil {
         hdmi_2_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_2_hdmi_in_video_enable", false);
         hdmi_2_setting.isReprocEnabled = pref.getBoolean("hdmi_2_reproc_enable", false);
         hdmi_2_setting.isRecorderEnabled = pref.getBoolean("hdmi_2_recorder_enable", false);
+        hdmi_2_setting.isTunnelingEnabled = pref.getBoolean("hdmi_2_tunneling_enable", false);
 
         data.add(hdmi_2_setting);
 
@@ -220,6 +223,7 @@ public class SettingsUtil {
         hdmi_3_setting.isHDMIinVideoEnabled = pref.getBoolean("hdmi_3_hdmi_in_video_enable", false);
         hdmi_3_setting.isReprocEnabled = pref.getBoolean("hdmi_3_reproc_enable", false);
         hdmi_3_setting.isRecorderEnabled = pref.getBoolean("hdmi_3_recorder_enable", false);
+        hdmi_3_setting.isTunnelingEnabled = pref.getBoolean("hdmi_3_tunneling_enable", false);
 
         data.add(hdmi_3_setting);
         Log.v(TAG, "SettingsUtil exit");
@@ -239,6 +243,7 @@ public class SettingsUtil {
             Log.d(TAG, "Is HDMIin Video Enabled : " + data.get(it).isHDMIinVideoEnabled);
             Log.d(TAG, "Is Reproc Enabled : " + data.get(it).isReprocEnabled);
             Log.d(TAG, "Is Recorder Enabled : " + data.get(it).isRecorderEnabled);
+            Log.d(TAG, "Is Tunneling Enabled : " + data.get(it).isTunnelingEnabled);
             Log.d(TAG, "#####################################");
         }
     }
@@ -289,5 +294,9 @@ public class SettingsUtil {
 
     public Boolean getIsRecorderEnabled(int index) {
         return data.get(index).isRecorderEnabled;
+    }
+
+    public Boolean getIsTunnelingEnabled(int index) {
+        return data.get(index).isTunnelingEnabled;
     }
 }

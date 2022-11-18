@@ -27,12 +27,47 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+/*
+# Changes from Qualcomm Innovation Center are provided under the following license :
+# Copyright(c) 2022 Qualcomm Innovation Center, Inc.
+#
+# Redistributionand use in sourceand binary forms, with or without
+# modification, are permitted(subject to the limitations in the
+# disclaimer below) provided that the following conditions are met :
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditionsand the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above
+#      copyright notice, this list of conditionsand the following
+#      disclaimer in the documentationand /or other materials provided
+#      with the distribution.
+#
+#    * Neither the name Qualcomm Innovation Center nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+# GRANTED BY THIS LICENSE.THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+# HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+# GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+# IN CONTRACT, STRICT LIABILITY, OR TORT(INCLUDING NEGLIGENCE OR
+# OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+# IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include <stdio.h>
 #include <unistd.h>
 
 #include <string>
-#include <mutex>
-#include <condition_variable>
+#include <pthread.h>
 
 #include "umd-camera.h"
 
@@ -42,15 +77,19 @@ const char *helpStr = "[-v device] [-a device] [-m device] [-c cameraId]\n" \
                     "    -m : Mic audio device\n" \
                     "    -c : Camera Id";
 
-std::condition_variable stop_condidion;
-std::mutex stop_mutex;
 bool stop_flag = false;
+pthread_mutex_t mainlock;
+pthread_cond_t  maincond;
+
 
 void handle_int_signal (int signal)
 {
-  std::lock_guard<std::mutex> lock(stop_mutex);
+  printf ("Received SIGINT signal %d\n", signal);
+
+  pthread_mutex_lock (&mainlock);
   stop_flag = true;
-  stop_condidion.notify_all();
+  pthread_cond_signal (&maincond);
+  pthread_mutex_unlock (&mainlock);
 }
 
 int main(int argc, char * argv[]) {
@@ -95,8 +134,11 @@ int main(int argc, char * argv[]) {
 
   signal (SIGINT, handle_int_signal);
 
-  std::unique_lock<std::mutex> lock(stop_mutex);
-  stop_condidion.wait(lock, [] {return stop_flag;} );
+  pthread_mutex_lock(&mainlock);
+  while (!stop_flag) {
+      pthread_cond_wait(&maincond, &mainlock);
+  }
+  pthread_mutex_unlock(&mainlock);
 
   return 0;
 }

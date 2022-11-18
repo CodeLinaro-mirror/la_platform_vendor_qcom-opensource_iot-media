@@ -64,7 +64,9 @@ package org.codeaurora.qmedia.fragments;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.ImageFormat;
+import android.graphics.Rect;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
@@ -85,8 +87,6 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
-import android.media.MediaRecorder;
-import java.io.IOException;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -99,10 +99,10 @@ import org.codeaurora.qmedia.MediaCodecRecorder;
 import org.codeaurora.qmedia.PresentationBase;
 import org.codeaurora.qmedia.R;
 import org.codeaurora.qmedia.SettingsUtil;
-//import org.codeaurora.qmedia.SnpeBase;
 import org.codeaurora.qmedia.opengles.VideoComposer;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -141,6 +141,7 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
     private String mHDMIinCameraID = "";
     //private SnpeBase mSnpeBase = null;
     private MediaRecorder mRecorder;
+    private Rect mPrimaryDisplaySize = null;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -178,9 +179,11 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                                 "Invalid Decode configuration", Toast.LENGTH_SHORT).show();
                 }
             }
-        } else if (mSettingData.getHDMISource(0).equals("Camera") &&
-                mSettingData.getIsReprocEnabled(0)) { // This is to handle reproc use case
-            return inflater.inflate(R.layout.reproc_use_case, container, false);
+        } else if (mSettingData.getHDMISource(0).equals("Camera")) {
+            if (mSettingData.getIsReprocEnabled(0))// This is to handle reproc use case
+                return inflater.inflate(R.layout.reproc_use_case, container, false);
+            else if (mSettingData.getIsTunnelingEnabled(0))
+                return inflater.inflate(R.layout.tunnel_primary_display, container, false);
         } else if (mSettingData.getHDMISource(0).equals("SNPE")) {
             return inflater.inflate(R.layout.primary_display_ml, container, false);
         }
@@ -236,7 +239,7 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
 
         Display[] displays = mDisplayManager.getDisplays(
                 DisplayManager.DISPLAY_CATEGORY_PRESENTATION);
-        Log.i(TAG, "Number of display # " + displays.length);
+        Log.i(TAG, "Number of secondary display # " + displays.length);
 
         for (int it = 0; it < displays.length; it++) {
             mPresentationBaseList.add(new PresentationBase(getContext(), displays[it],
@@ -250,6 +253,18 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                 mPresentationBaseList.remove(it);
             }
         }
+
+        displays = mDisplayManager.getDisplays();
+        Log.i(TAG, "Total Physical display count # " + displays.length);
+        mPrimaryDisplaySize = new Rect();
+        Resources resources = getResources();
+        int navBarHeight = 0;
+        int resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            navBarHeight =  resources.getDimensionPixelSize(resourceId);
+        }
+        displays[0].getRectSize(mPrimaryDisplaySize);
+        mPrimaryDisplaySize.top = mPrimaryDisplaySize.top + navBarHeight;
         Log.v(TAG, "Exit onResume");
     }
 
@@ -302,6 +317,7 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
             it.dismiss();
         }
         mPresentationBaseList.clear();
+        mPrimaryDisplaySize = null;
         Log.v(TAG, "Exit OnPause");
     }
 
@@ -466,6 +482,10 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                             });
                             mCameraBase = new CameraBase(getContext(), mCameraDisconnectedListenerObject);
                             mCameraBase.addPreviewStream(mHDMIinSurfaceHolder);
+                            // CSI - DSI Tunneling
+                            if (mSettingData.getIsTunnelingEnabled(0)) {
+                                mCameraBase.enableTunneling(mPrimaryDisplaySize, 0);
+                            }
                             if (mSettingData.getIsHDMIinVideoEnabled(0)) {
                                 // Create Encoder instance if Video is enabled
                                 mMediaCodecRecorder =
@@ -625,7 +645,10 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
                     holder.setFixedSize(width, height);
 
                     mCameraBase.addPreviewStream(holder.getSurface());
-
+                    // CSI - DSI Tunneling
+                    if (mSettingData.getIsTunnelingEnabled(0)) {
+                        mCameraBase.enableTunneling(mPrimaryDisplaySize, 0);
+                    }
                     if (mSettingData.getIsRecorderEnabled(0)) {
                         mMediaCodecRecorder = new MediaCodecRecorder(mContext, width, height, false);
 

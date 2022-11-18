@@ -131,6 +131,11 @@
             android:key="hdmi_1_recorder_enable"
             android:title="Recorder enable" />
 
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_1_tunneling_enable"
+            android:title="Tunneling enable" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="HDMI Out 2">
@@ -201,6 +206,11 @@
             android:key="hdmi_2_recorder_enable"
             android:title="Recorder enable" />
 
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_2_tunneling_enable"
+            android:title="Tunneling enable" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="HDMI Out 3">
@@ -270,6 +280,11 @@
             android:defaultValue="false"
             android:key="hdmi_3_recorder_enable"
             android:title="Recorder enable" />
+
+        <androidx.preference.SwitchPreference
+            android:defaultValue="false"
+            android:key="hdmi_3_tunneling_enable"
+            android:title="Tunneling enable" />
 
     </PreferenceCategory>
 
