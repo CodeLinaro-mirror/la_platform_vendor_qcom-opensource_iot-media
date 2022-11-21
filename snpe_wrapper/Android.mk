@@ -2,6 +2,8 @@ LOCAL_PATH := $(call my-dir)
 
 SNPE_SDK := snpe-1.55.0.2958
 
+include $(LOCAL_PATH)/include/Android.mk
+
 include $(CLEAR_VARS)
 
 LOCAL_MODULE = libai_snpe_wrapper
@@ -26,7 +28,11 @@ else
   LOCAL_SRC_FILES := snpe_wrapper_dummy.cc
 endif
 
-LOCAL_COPY_HEADERS := snpe_wrapper_interface.h
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/include/Android.mk
+
+LOCAL_EXPORT_HEADER_LIBRARY_HEADERS := libai_snpe_wrapper_headers
+
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
 
 include $(BUILD_SHARED_LIBRARY)
 

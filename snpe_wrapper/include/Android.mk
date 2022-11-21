@@ -1,0 +1,11 @@
+SNPE_WRAPPER_HEADERS_PATH:= $(call my-dir)
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := libai_snpe_wrapper_headers
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(SNPE_WRAPPER_HEADERS_PATH)
+
+LOCAL_VENDOR_MODULE := true
+
+include $(BUILD_HEADER_LIBRARY)

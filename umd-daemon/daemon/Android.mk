@@ -37,4 +37,6 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_STATIC_LIBRARIES := \
     android.hardware.camera.common@1.0-helper
 
+LOCAL_HEADER_LIBRARIES := libqtiumdheaders
+
 include $(BUILD_EXECUTABLE)

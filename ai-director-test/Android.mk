@@ -30,6 +30,8 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.graphics.allocator@3.0 \
     android.hardware.graphics.mapper@3.0
 
+LOCAL_HEADER_LIBRARIES += libqtiaidirectorheaders
+
 LOCAL_STATIC_LIBRARIES := \
     android.hardware.camera.common@1.0-helper \
 
