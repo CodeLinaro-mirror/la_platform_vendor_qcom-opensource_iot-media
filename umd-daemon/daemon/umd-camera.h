@@ -29,7 +29,7 @@
 
  /*
  # Changes from Qualcomm Innovation Center are provided under the following license :
- # Copyright(c) 2022 Qualcomm Innovation Center, Inc.
+ # Copyright(c) 2022-2023 Qualcomm Innovation Center, Inc.
  #
  # Redistributionand use in sourceand binary forms, with or without
  # modification, are permitted(subject to the limitations in the
@@ -229,7 +229,6 @@ private:
   IAllocDevice* mAllocDeviceInterface;
   CameraMetadata mStaticInfo;
   CameraClientCallbacks mClientCb;
-  CameraStreamParameters mStreamParams;
   Camera3Request mRequest;
 
   int64_t mLastFrameNumber;
@@ -243,4 +242,5 @@ private:
   std::unique_ptr<IAudioRecorder> mAudioRecorder;
 
   UVCControlValues mCtrlValues;
+  StreamRotation mRotation;
 };

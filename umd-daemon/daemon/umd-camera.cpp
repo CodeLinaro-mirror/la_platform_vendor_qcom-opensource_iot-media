@@ -29,7 +29,7 @@
 
 /*
 # Changes from Qualcomm Innovation Center are provided under the following license :
-# Copyright(c) 2022 Qualcomm Innovation Center, Inc.
+# Copyright(c) 2022-2023 Qualcomm Innovation Center, Inc.
 #
 # Redistributionand use in sourceand binary forms, with or without
 # modification, are permitted(subject to the limitations in the
@@ -113,7 +113,8 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
     mLastFrameNumber(-1),
     mVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
     mAudioRecorder(nullptr),
-    mCtrlValues({}) {}
+    mCtrlValues({}),
+    mRotation(StreamRotation::ROTATION_0) {}
 
 UmdCamera::~UmdCamera() {
 
@@ -232,6 +233,31 @@ int32_t UmdCamera::InitializeCamera() {
   if (ret) {
     UMD_LOG_ERROR("GetCameraInfo failed!\n");
     return ret;
+  }
+
+  // Get the sensor orientation
+  auto entry = mStaticInfo.find(ANDROID_SENSOR_ORIENTATION);
+  if (entry.count == 0)
+    UMD_LOG_ERROR("ANDROID_SENSOR_ORIENTATION info is not available \n");
+  else {
+    UMD_LOG_INFO("Sensor orientation is %d \n",entry.data.i32[0]);
+    switch (entry.data.i32[0]) {
+    case 0:
+      mRotation = StreamRotation::ROTATION_0;
+      break;
+    case 90:
+      mRotation = StreamRotation::ROTATION_90;
+      break;
+    case 180:
+      mRotation = StreamRotation::ROTATION_180;
+      break;
+    case 270:
+      mRotation = StreamRotation::ROTATION_270;
+      break;
+    default:
+      UMD_LOG_ERROR("Invalid Sensor Orientation \n");
+      break;
+    }
   }
 
   ret = mDeviceClient->CreateDefaultRequest(RequestTemplate::PREVIEW,
@@ -1247,6 +1273,8 @@ bool UmdCamera::CameraStart() {
 
   const std::lock_guard<std::mutex> lock(mCameraMutex);
 
+  CameraStreamParameters params = {};
+
   mVideoBufferThread = std::unique_ptr<std::thread>(
       new std::thread(&UmdCamera::videoBufferLoop, this));
 
@@ -1267,15 +1295,15 @@ bool UmdCamera::CameraStart() {
     return false;
   }
 
-  mStreamParams = {};
-  mStreamParams.bufferCount = STREAM_BUFFER_COUNT;
+  params.bufferCount = STREAM_BUFFER_COUNT;
+  params.rotation = mRotation;
 
   switch (mVsetup.format) {
     case UMD_VIDEO_FMT_YUYV:
-      mStreamParams.format = PixelFormat::YCBCR_422_I;
+      params.format = PixelFormat::YCBCR_422_I;
       break;
     case UMD_VIDEO_FMT_MJPEG:
-      mStreamParams.format = PixelFormat::BLOB;
+      params.format = PixelFormat::BLOB;
       break;
     default:
       UMD_LOG_ERROR ("Unsupported video format: %d!\n", mVsetup.format);
@@ -1283,13 +1311,13 @@ bool UmdCamera::CameraStart() {
       break;
   }
 
-  mStreamParams.width = mVsetup.width;
-  mStreamParams.height = mVsetup.height;
-  mStreamParams.allocFlags.flags = IMemAllocUsage::kSwReadOften |
-                                   IMemAllocUsage::kHwCameraWrite;
-  mStreamParams.cb = [&](StreamBuffer buffer) { StreamCb(buffer); };
+  params.width = mVsetup.width;
+  params.height = mVsetup.height;
+  params.allocFlags.flags = IMemAllocUsage::kSwReadOften |
+                            IMemAllocUsage::kHwCameraWrite;
+  params.cb = [&](StreamBuffer buffer) { StreamCb(buffer); };
 
-  mStreamId = mDeviceClient->CreateStream(mStreamParams);
+  mStreamId = mDeviceClient->CreateStream(params);
   if (mStreamId < 0) {
     UMD_LOG_ERROR("Camera CreateStream failed!\n");
     return false;
