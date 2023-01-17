@@ -1,0 +1,77 @@
+/*
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+#include "audio-pcm.h"
+
+const uint32_t UAC_PLAYBACK_SAMPLE_RATE = 48000;
+const uint32_t UAC_CAPTURE_SAMPLE_RATE = 44100;
+const uint32_t AUDIO_RECORDER_PERIOD_SIZE = 1024;
+const uint32_t AUDIO_RECORDER_PERIOD_COUNT = 4;
+const uint32_t AUDIO_RECORDER_NUM_CHANNELS = 2;
+
+PcmNode::PcmNode(unsigned int card,
+                 unsigned int device,
+                 AudioPcmMode pcmmode,
+                 AudioDirection audiodirection)
+  : mCard(card),
+    mDevice(device),
+    mPcmMode(pcmmode) {
+  mConfig.period_size = AUDIO_RECORDER_PERIOD_SIZE;
+  mConfig.period_count = AUDIO_RECORDER_PERIOD_COUNT;
+  mConfig.channels = AUDIO_RECORDER_NUM_CHANNELS;
+
+  mConfig.silence_threshold = 0;
+  mConfig.format = PCM_FORMAT_S16_LE;
+  if (audiodirection == AUDIO_HOST_TO_DEVICE)
+    mConfig.rate = UAC_CAPTURE_SAMPLE_RATE;
+  else
+    mConfig.rate = UAC_PLAYBACK_SAMPLE_RATE;
+
+  if (mPcmMode == AUDIO_PCM_CAPTURE) {
+    mConfig.stop_threshold = 0;
+    mConfig.start_threshold = 0;
+  } else {
+    mConfig.stop_threshold = mConfig.period_size * mConfig.period_count;
+    mConfig.start_threshold = mConfig.period_size * mConfig.period_count;
+  }
+}
+
+PcmNode::~PcmNode() {}
+
+struct pcm *PcmNode::Open() {
+  if (mPcmMode == AUDIO_PCM_CAPTURE)
+    mPcm = pcm_open(mCard, mDevice, PCM_IN | PCM_MONOTONIC, &mConfig);
+  else
+    mPcm = pcm_open(mCard, mDevice, PCM_OUT, &mConfig);
+
+  return mPcm;
+}
+
+void PcmNode::Close() {
+  pcm_close(mPcm);
+}
+
+size_t PcmNode::GetBufferSize() {
+  mBufSize = pcm_frames_to_bytes(mPcm, pcm_get_buffer_size(mPcm));
+  return mBufSize;
+}
+
+int PcmNode::Read(AudioBuffer *buffer) {
+  int res = pcm_read(mPcm, buffer->data, mBufSize);
+  return res;
+}
+
+int PcmNode::Write(AudioBuffer *buffer) {
+  int res = pcm_write(mPcm, buffer->data, buffer->size);
+  return res;
+}
+
+int PcmNode::IsReady() {
+  return pcm_is_ready(mPcm);
+}
+
+int PcmNode::GetTimeStamp(unsigned int *avail, struct timespec *ts) {
+  return pcm_get_htimestamp(mPcm, avail, ts);
+}

@@ -27,6 +27,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ */
+
 #include "audio-stream.h"
 
 #include "message_queue.h"
@@ -34,11 +41,12 @@
 
 #define LOG_TAG "AudioStream"
 
-AudioStream::AudioStream(IAudioRecorderCallback *callback, uint32_t buffer_size, uint32_t buffers_count)
-  : mCallback(callback),
-    mBufferSize(buffer_size),
+AudioStream::AudioStream(uint32_t buffer_size, uint32_t buffers_count,
+                         std::unique_ptr<PcmNode> & mPcmNodePlayback)
+  : mBufferSize(buffer_size),
     mBuffersCount(buffers_count),
-    mThread(nullptr) {}
+    mThread(nullptr),
+    mPcmNode(mPcmNodePlayback) {}
 
 AudioStream::~AudioStream() {
   AudioCallbackMsg msg{};
@@ -131,7 +139,8 @@ void AudioStream::StreamLoopHandler() {
     mMsg.pop(msg);
     switch(msg.type) {
       case AUDIO_CALLBACK_MSG_SUBMIT:
-        mCallback->onAudioBuffer(msg.buffer);
+        if (mPcmNode->Write(msg.buffer) < 0)
+          UMD_LOG_ERROR ("Failed to write buffer! \n");
         mMutex.lock();
         if (mBuffersMap.find(msg.buffer) != mBuffersMap.end()) {
           mBuffersMap.erase(msg.buffer);

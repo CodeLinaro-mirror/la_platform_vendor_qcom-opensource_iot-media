@@ -27,6 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 /*
 # Changes from Qualcomm Innovation Center are provided under the following license :
 # Copyright(c) 2022-2023 Qualcomm Innovation Center, Inc.
@@ -83,15 +84,12 @@
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
 const uint32_t STREAM_BUFFER_COUNT = 4;
-const uint32_t UAC_SAMPLE_RATE = 48000;
-const uint32_t AUDIO_RECORDER_PERIOD_SIZE = 1024;
-const uint32_t AUDIO_RECORDER_PERIOD_COUNT = 4;
-const uint32_t AUDIO_RECORDER_NUM_CHANNELS = 2;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
 
-UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev, int cameraId)
+UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
+                     int cameraId, std::string speakerdev)
   : mGadget(nullptr),
     mVsetup({}),
     mUmdVideoCallbacks({
@@ -102,6 +100,7 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
     mUvcDev(uvcdev),
     mUacDev(uacdev),
     mMicDev(micdev),
+    mSpeakerDev(speakerdev),
     mCameraId(cameraId),
     mStreamId(-1),
     mActive(false),
@@ -112,7 +111,8 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
     mClientCb({}),
     mLastFrameNumber(-1),
     mVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
-    mAudioRecorder(nullptr),
+    mAudioPlayback(nullptr),
+    mAudioCapture(nullptr),
     mCtrlValues({}),
     mRotation(StreamRotation::ROTATION_0) {}
 
@@ -124,9 +124,12 @@ UmdCamera::~UmdCamera() {
   if (mCameraThread) {
     mCameraThread->join();
   }
-  if (mAudioRecorder) {
-    mAudioRecorder->Stop();
-  }
+
+  if (mAudioPlayback)
+    mAudioPlayback->Stop();
+
+  if (mAudioCapture)
+    mAudioCapture->Stop();
 
   if (mGadget != nullptr)
     umd_gadget_free (mGadget);
@@ -165,8 +168,8 @@ int32_t UmdCamera::Initialize() {
   }
 
   mGadget = umd_gadget_new(mUvcDev.empty() ? nullptr : mUvcDev.c_str(),
-    mUacDev.empty() ? nullptr : mUacDev.c_str(), &mUmdVideoCallbacks, this);
-  if (nullptr == mGadget) {
+      nullptr, &mUmdVideoCallbacks, this);
+  if (nullptr == mGadget && !mUvcDev.empty()) {
     UMD_LOG_ERROR ("Failed to create UMD gadget!\n");
     return -ENODEV;
   }
@@ -180,10 +183,19 @@ int32_t UmdCamera::Initialize() {
   }
 
   if (!mUacDev.empty()) {
-    res = mAudioRecorder->Start();
-    if (res != 0) {
-      UMD_LOG_ERROR("Failed to start audio recorder!\n");
-      return res;
+    if (!mMicDev.empty()) {
+      res = mAudioPlayback->Start();
+      if (res != 0) {
+        UMD_LOG_ERROR("Failed to start audio recorder!\n");
+        return res;
+      }
+    }
+    if (!mSpeakerDev.empty()) {
+      res = mAudioCapture->Start();
+      if (res != 0) {
+        UMD_LOG_ERROR("Failed to start audio recorder!\n");
+        return res;
+      }
     }
   }
 
@@ -273,23 +285,29 @@ int32_t UmdCamera::InitializeCamera() {
 }
 
 int32_t UmdCamera::InitializeAudio() {
+  if (!mMicDev.empty()) {
+    mAudioPlayback = std::unique_ptr<AudioRecorder>(
+        new AudioRecorder(mMicDev.c_str(), mUacDev.c_str(), AUDIO_DEVICE_TO_HOST));
 
-  AudioRecorderConfig config;
-  config.samplerate = UAC_SAMPLE_RATE;
-  config.format = AUDIO_FORMAT_S16_LE;
-  config.period_size = AUDIO_RECORDER_PERIOD_SIZE;
-  config.period_count = AUDIO_RECORDER_PERIOD_COUNT;
-  config.channels = AUDIO_RECORDER_NUM_CHANNELS;
-  mAudioRecorder = std::unique_ptr<AudioRecorder>(
-    new AudioRecorder(mMicDev, config, this));
+    if (mAudioPlayback == nullptr) {
+      UMD_LOG_ERROR("AudioPlayback creation failed!\n");
+      return -ENOMEM;
+    }
+  }
 
-  if (mAudioRecorder == nullptr) {
-    UMD_LOG_ERROR("AudioRecorder creation failed!\n");
-    return -ENOMEM;
+  if (!mSpeakerDev.empty()) {
+    mAudioCapture = std::unique_ptr<AudioRecorder>(
+        new AudioRecorder(mUacDev.c_str(), mSpeakerDev.c_str(), AUDIO_HOST_TO_DEVICE));
+
+    if (mAudioCapture == nullptr) {
+      UMD_LOG_ERROR("AudioCapture creation failed!\n");
+      return -ENOMEM;
+    }
   }
 
   return 0;
 }
+
 bool UmdCamera::setupVideoStream(UmdVideoSetup * stmsetup, void * userdata) {
   UmdCamera *ctx = static_cast<UmdCamera*>(userdata);
 
@@ -1198,14 +1216,6 @@ fail_unmap:
 
 fail_return:
   mDeviceClient->ReturnStreamBuffer(buffer);
-}
-
-void UmdCamera::onAudioBuffer(AudioBuffer* buffer) {
-  if (mActive || mOnlyUAC) {
-    uint32_t bufidx = umd_gadget_submit_buffer(mGadget, UMD_AUDIO_STREAM_ID,
-      buffer->data, buffer->size, buffer->size, buffer->timestamp);
-    umd_gadget_wait_buffer(mGadget, UMD_AUDIO_STREAM_ID, bufidx);
-  }
 }
 
 void UmdCamera::cameraThreadHandler() {

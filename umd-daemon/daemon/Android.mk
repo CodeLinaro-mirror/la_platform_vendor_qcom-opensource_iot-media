@@ -8,7 +8,8 @@ LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SRC_FILES := umd-camera.cpp \
                    audio-recorder.cpp \
                    audio-stream.cpp \
-                   main.cpp
+                   main.cpp \
+                   audio-pcm.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libqtiumd \

@@ -27,6 +27,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ */
+
 #pragma once
 
 #include <string.h>
@@ -46,6 +53,11 @@ enum AudioFormat {
   AUDIO_FORMAT_MAX
 };
 
+enum AudioDirection {
+  AUDIO_HOST_TO_DEVICE,
+  AUDIO_DEVICE_TO_HOST
+};
+
 struct AudioRecorderConfig {
   AudioFormat format;
   uint32_t samplerate;
@@ -54,10 +66,9 @@ struct AudioRecorderConfig {
   uint32_t channels;
 };
 
-class IAudioRecorderCallback {
- public:
-  virtual ~IAudioRecorderCallback() {};
-  virtual void onAudioBuffer(AudioBuffer * buffer) = 0;
+enum AudioPcmMode {
+  AUDIO_PCM_CAPTURE,
+  AUDIO_PCM_PLAYBACK
 };
 
 class IAudioRecorder {

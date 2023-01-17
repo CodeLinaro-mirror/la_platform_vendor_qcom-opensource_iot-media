@@ -27,6 +27,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ */
+
 #include "audio-recorder.h"
 
 #include "umd-logging.h"
@@ -35,17 +42,18 @@
 
 const uint32_t AUDIO_BUFFERS_COUNT = 4;
 
-AudioRecorder::AudioRecorder(std::string audiodev,
-                             AudioRecorderConfig config,
-                             IAudioRecorderCallback *callback)
-  : mAudioDev(audiodev),
-    mConfig(config),
-    mPcm(nullptr),
+AudioRecorder::AudioRecorder(std::string audiodevcapture,
+                             std::string audiodevplayback,
+                             AudioDirection audiodirection)
+  : mAudioDevCapture(audiodevcapture),
+    mAudioDevPlayback(audiodevplayback),
+    mPcmCaptureHandle(nullptr),
+    mPcmPlaybackHandle(nullptr),
     mMixer(nullptr),
+    mAudioDirection(audiodirection),
     mThread(nullptr),
     mRecording(false),
     mBufSize(0),
-    mCallback(callback),
     mAudioStream(nullptr),
     mErrorCode(0) {}
 
@@ -55,69 +63,56 @@ AudioRecorder::~AudioRecorder() {
 
 int32_t AudioRecorder::Start() {
   const std::lock_guard<std::mutex> lock(mMutex);
-
+  unsigned int pcm_card_in, pcm_dev_in;
+  unsigned int pcm_card_out, pcm_dev_out;
+  unsigned int mixer_card;
   mErrorCode = 0;
 
-  if (mCallback == nullptr) {
-    UMD_LOG_ERROR ("Invalid audio callback!\n");
-    return -EINVAL;
-  }
+  int resCapture = GetPcmCardDetails(mAudioDevCapture, pcm_card_in, pcm_dev_in);
+  if (resCapture)
+    return resCapture;
+  int resPlayback = GetPcmCardDetails(mAudioDevPlayback, pcm_card_out, pcm_dev_out);
+  if (resPlayback)
+    return resPlayback;
 
-  struct pcm_config cfg{};
-  cfg.period_size = mConfig.period_size;
-  cfg.period_count = mConfig.period_count;
-  cfg.channels = mConfig.channels;
-  cfg.rate = mConfig.samplerate;
-
-  cfg.format = AudioRecorderToPcmFormat(mConfig.format);
-  if (cfg.format == PCM_FORMAT_INVALID) {
-    UMD_LOG_ERROR ("Unsupported audio format: %d\n", mConfig.format);
-    return -EINVAL;
-  }
-
-  cfg.start_threshold = 0;
-  cfg.stop_threshold = 0;
-  cfg.silence_threshold = 0;
-
-  unsigned int pcm_card, pcm_dev;
-  if (mAudioDev[0] != 'h' ||
-      mAudioDev[1] != 'w' ||
-      mAudioDev[2] != ':' ||
-      mAudioDev.length() < 4) {
-    UMD_LOG_ERROR ("Invalid device name %s\n", mAudioDev.c_str());
-    return -EINVAL;
-  }
-
-  if (sscanf(&mAudioDev[3], "%u,%u", &pcm_card, &pcm_dev) != 2) {
-    UMD_LOG_ERROR ("Invalid device name %s\n", mAudioDev.c_str());
-    return -EINVAL;
-  }
-
-  mMixer = mixer_open(pcm_card);
+  mixer_card = (mAudioDirection == AUDIO_DEVICE_TO_HOST) ? pcm_card_in :
+                pcm_card_out;
+  mMixer = mixer_open(mixer_card);
   if (mMixer == nullptr) {
     UMD_LOG_ERROR ("Mixer device open failed!\n");
     return -ENODEV;
   }
 
-  if (SetMixerConfiguration(mMixer) != 0) {
+  if (SetMixerConfiguration(mMixer, mAudioDirection) != 0) {
     UMD_LOG_ERROR ("Audio mixer configuration failed!\n");
     return -EINVAL;
   }
 
-  mPcm = pcm_open(pcm_card, pcm_dev, PCM_IN | PCM_MONOTONIC, &cfg);
-  if (mPcm == nullptr) {
-    UMD_LOG_ERROR ("Pcm open failed!\n");
+  mPcmNodeCapture = std::unique_ptr<PcmNode>(
+      new PcmNode(pcm_card_in, pcm_dev_in, AUDIO_PCM_CAPTURE, mAudioDirection));
+
+  mPcmCaptureHandle = mPcmNodeCapture->Open();
+  if (mPcmCaptureHandle == nullptr) {
+    UMD_LOG_ERROR ("Pcm open of Capture node failed!\n");
     return -ENODEV;
   }
 
-  mBufSize = pcm_frames_to_bytes(mPcm, pcm_get_buffer_size(mPcm));
+  mPcmNodePlayback = std::unique_ptr<PcmNode>(
+      new PcmNode(pcm_card_out, pcm_dev_out, AUDIO_PCM_PLAYBACK, mAudioDirection));
+  mPcmPlaybackHandle = mPcmNodePlayback->Open();
+  if (mPcmPlaybackHandle == nullptr) {
+    UMD_LOG_ERROR ("Pcm open of Playback node failed!\n");
+    return -ENODEV;
+  }
+
+  mBufSize = mPcmNodeCapture->GetBufferSize();
   if (mBufSize == 0) {
     UMD_LOG_ERROR ("Invalid audio buffer size!\n");
     return -EINVAL;
   }
 
   mAudioStream = std::unique_ptr<AudioStream>(
-      new AudioStream(mCallback, mBufSize, AUDIO_BUFFERS_COUNT));
+      new AudioStream(mBufSize, AUDIO_BUFFERS_COUNT, mPcmNodePlayback));
 
   if (mAudioStream == nullptr) {
     UMD_LOG_ERROR ("Audio stream creation failed!\n");
@@ -144,6 +139,24 @@ int32_t AudioRecorder::Start() {
   return 0;
 }
 
+int32_t AudioRecorder::GetPcmCardDetails(std::string mAudioDev,
+                                         unsigned int &pcm_card,
+                                         unsigned int &pcm_dev) {
+  if (mAudioDev[0] != 'h' ||
+      mAudioDev[1] != 'w' ||
+      mAudioDev[2] != ':' ||
+      mAudioDev.length() < 4) {
+    UMD_LOG_ERROR ("Invalid device name %s\n", mAudioDev.c_str());
+    return -EINVAL;
+  }
+
+  if (sscanf(&mAudioDev[3], "%u,%u", &pcm_card, &pcm_dev) != 2) {
+    UMD_LOG_ERROR ("Invalid device name %s\n", mAudioDev.c_str());
+    return -EINVAL;
+  }
+  return 0;
+}
+
 int32_t AudioRecorder::Stop() {
   const std::lock_guard<std::mutex> lock(mMutex);
 
@@ -155,16 +168,21 @@ int32_t AudioRecorder::Stop() {
   }
 
   if (mMixer != nullptr) {
-    if (MixerRelease(mMixer) != 0) {
+    if (MixerRelease(mMixer, mAudioDirection) != 0) {
       UMD_LOG_ERROR ("Audio mixer release failed!\n");
     }
     mixer_close(mMixer);
     mMixer = nullptr;
   }
 
-  if (mPcm != nullptr) {
-    pcm_close(mPcm);
-    mPcm = nullptr;
+  if (mPcmCaptureHandle != nullptr) {
+    mPcmNodeCapture->Close();
+    mPcmCaptureHandle = nullptr;
+  }
+
+  if (mPcmPlaybackHandle != nullptr) {
+    mPcmNodePlayback->Close();
+    mPcmPlaybackHandle = nullptr;
   }
 
   mAudioStream = nullptr;
@@ -188,138 +206,138 @@ void AudioRecorder::AudioThreadHandler() {
       break;
     }
 
-    res = pcm_read(mPcm, buffer->data, mBufSize);
+    res = mPcmNodeCapture->Read(buffer);
     if (!res) {
       struct timespec ts;
       unsigned int avail = 0;
-      if (pcm_get_htimestamp(mPcm, &avail, &ts)) {
+      if (mPcmNodeCapture->GetTimeStamp(&avail, &ts)) {
         clock_gettime(CLOCK_MONOTONIC, &ts);
       }
       buffer->timestamp = ts.tv_sec * 1000000000LL + ts.tv_nsec;
       buffer->size = mBufSize;
       mAudioStream->SubmitBuffer(buffer);
     } else {
-      UMD_LOG_ERROR ("pcm_read fail: %s\n", pcm_get_error(mPcm));
+      UMD_LOG_ERROR ("pcm_read fail: %s\n", pcm_get_error(mPcmCaptureHandle));
       mAudioStream->ReturnBuffer(buffer);
       mErrorCode = res;
-      break;
     }
   }
 }
 
-pcm_format AudioRecorder::AudioRecorderToPcmFormat(AudioFormat format) {
-  switch (format) {
-    case AUDIO_FORMAT_S8:
-      return PCM_FORMAT_S8;
-      break;
-    case AUDIO_FORMAT_S16_LE:
-      return PCM_FORMAT_S16_LE;
-      break;
-    case AUDIO_FORMAT_S24_LE:
-      return PCM_FORMAT_S24_LE;
-      break;
-    case AUDIO_FORMAT_S24_3LE:
-      return PCM_FORMAT_S24_3LE;
-      break;
-    case AUDIO_FORMAT_S32_LE:
-      return PCM_FORMAT_S32_LE;
-      break;
-    default:
-      UMD_LOG_ERROR ("Unsupported audio format!\n");
-      return PCM_FORMAT_INVALID;
-      break;
-  }
-}
-
-int32_t AudioRecorder::SetMixerConfiguration(struct mixer *mixer) {
+int32_t AudioRecorder::SetMixerConfiguration(struct mixer *mixer,
+                                             AudioDirection audiodirection) {
   struct mixer_ctl *ctl = nullptr;
   int32_t ret = 0;
 
-  ctl = mixer_get_ctl_by_name(mixer, "TX_CDC_DMA_TX_3 Channels");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+  if (audiodirection == AUDIO_DEVICE_TO_HOST) {
+    ctl = mixer_get_ctl_by_name(mixer, "TX_CDC_DMA_TX_3 Channels");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ret = mixer_ctl_set_enum_by_string(ctl, "One");
-  if (ret) {
-    return ret;
-  }
+    ret = mixer_ctl_set_enum_by_string(ctl, "One");
+    if (ret) {
+      return ret;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "TX_AIF1_CAP Mixer DEC2");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ctl = mixer_get_ctl_by_name(mixer, "TX_AIF1_CAP Mixer DEC2");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ret = mixer_ctl_set_value(ctl, 0, 1);
-  if (ret) {
-    return ret;
-  }
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "TX DMIC MUX2");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ctl = mixer_get_ctl_by_name(mixer, "TX DMIC MUX2");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ret = mixer_ctl_set_enum_by_string(ctl, "DMIC0");
-  if (ret) {
-    return ret;
-  }
+    ret = mixer_ctl_set_enum_by_string(ctl, "DMIC0");
+    if (ret) {
+      return ret;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "TX_DEC2 Volume");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ctl = mixer_get_ctl_by_name(mixer, "TX_DEC2 Volume");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ret = mixer_ctl_set_value(ctl, 0, 112);
-  if (ret) {
-    return ret;
-  }
+    ret = mixer_ctl_set_value(ctl, 0, 112);
+    if (ret) {
+      return ret;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "MultiMedia1 Mixer TX_CDC_DMA_TX_3");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ctl = mixer_get_ctl_by_name(mixer, "MultiMedia1 Mixer TX_CDC_DMA_TX_3");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ret = mixer_ctl_set_value(ctl, 0, 1);
-  if (ret) {
-    return ret;
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+  } else {
+    ctl = mixer_get_ctl_by_name(mixer, "QUAT_MI2S_RX Audio Mixer MultiMedia1");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
   }
 
   return 0;
 }
 
-int32_t AudioRecorder::MixerRelease(struct mixer *mixer) {
+int32_t AudioRecorder::MixerRelease(struct mixer *mixer,
+                                    AudioDirection audiodirection) {
   struct mixer_ctl *ctl = nullptr;
   int32_t ret = 0;
+  if (audiodirection == AUDIO_DEVICE_TO_HOST) {
+    ctl = mixer_get_ctl_by_name(mixer, "TX_AIF1_CAP Mixer DEC2");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "TX_AIF1_CAP Mixer DEC2");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
 
-  ret = mixer_ctl_set_value(ctl, 0, 0);
-  if (ret) {
-    return ret;
-  }
+    ctl = mixer_get_ctl_by_name(mixer, "TX DMIC MUX2");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "TX DMIC MUX2");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ret = mixer_ctl_set_enum_by_string(ctl, "ZERO");
+    if (ret) {
+      return ret;
+    }
 
-  ret = mixer_ctl_set_enum_by_string(ctl, "ZERO");
-  if (ret) {
-    return ret;
-  }
+    ctl = mixer_get_ctl_by_name(mixer, "MultiMedia1 Mixer TX_CDC_DMA_TX_3");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ctl = mixer_get_ctl_by_name(mixer, "MultiMedia1 Mixer TX_CDC_DMA_TX_3");
-  if (ctl == nullptr) {
-    return -ENODEV;
-  }
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+  } else {
+    ctl = mixer_get_ctl_by_name(mixer, "QUAT_MI2S_RX Audio Mixer MultiMedia1");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
 
-  ret = mixer_ctl_set_value(ctl, 0, 0);
-  if (ret) {
-    return ret;
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
   }
 
   return 0;

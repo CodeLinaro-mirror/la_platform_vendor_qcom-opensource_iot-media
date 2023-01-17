@@ -133,9 +133,10 @@ struct UVCControlValues {
   uint64_t  pan_tilt_def;
 };
 
-class UmdCamera : public IAudioRecorderCallback, public RefBase {
+class UmdCamera : public RefBase {
 public:
-  UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev, int cameraId);
+  UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
+            int cameraId, std::string speakerdev);
   ~UmdCamera();
 
   int32_t Initialize();
@@ -189,7 +190,6 @@ private:
   void ResultCb(const CaptureResult &result);
   void StreamCb(StreamBuffer buffer);
 
-  void onAudioBuffer(AudioBuffer * buffer) override;
   int32_t InitializeAudio();
 
   void cameraThreadHandler();
@@ -216,6 +216,7 @@ private:
   std::string mUvcDev;
   std::string mUacDev;
   std::string mMicDev;
+  std::string mSpeakerDev;
 
   std::unique_ptr<std::thread> mCameraThread;
   MessageQ<UmdCameraMessage> mMsg;
@@ -239,7 +240,8 @@ private:
   MessageQ<std::pair<StreamBuffer, int32_t>> mVideoBufferQueue;
   std::unique_ptr<std::thread> mVideoBufferThread;
 
-  std::unique_ptr<IAudioRecorder> mAudioRecorder;
+  std::unique_ptr<IAudioRecorder> mAudioPlayback;
+  std::unique_ptr<IAudioRecorder> mAudioCapture;
 
   UVCControlValues mCtrlValues;
   StreamRotation mRotation;
