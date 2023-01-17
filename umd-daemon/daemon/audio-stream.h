@@ -27,6 +27,14 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ */
+
 #pragma once
 
 #include <utils/RefBase.h>
@@ -38,6 +46,8 @@
 #include "message_queue.h"
 #include "umd-logging.h"
 #include "audio-recorder-interface.h"
+#include <tinyalsa/asoundlib.h>
+#include "audio-pcm.h"
 
 enum AudioCallbackMsgType {
   AUDIO_CALLBACK_MSG_NONE,
@@ -53,7 +63,8 @@ struct AudioCallbackMsg {
 
 class AudioStream : public android::RefBase {
  public:
-  AudioStream(IAudioRecorderCallback *callback, uint32_t buffer_size, uint32_t buffers_count);
+  AudioStream(uint32_t buffer_size, uint32_t buffers_count,
+              std::unique_ptr<PcmNode> & mPcmNode);
   ~AudioStream();
 
   int32_t Init();
@@ -65,7 +76,6 @@ class AudioStream : public android::RefBase {
   void FreeBuffers();
   void StreamLoopHandler();
 
-  IAudioRecorderCallback *mCallback;
   uint32_t mBufferSize;
   uint32_t mBuffersCount;
   std::vector<AudioBuffer> mBuffers;
@@ -79,4 +89,5 @@ class AudioStream : public android::RefBase {
 
   std::unique_ptr<std::thread> mThread;
   MessageQ<AudioCallbackMsg> mMsg;
+  std::unique_ptr<PcmNode> & mPcmNode;
 };

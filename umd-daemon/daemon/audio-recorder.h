@@ -27,12 +27,20 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
+ */
+
 #pragma once
 
 #include <string.h>
 #include <tinyalsa/asoundlib.h>
 
 #include "audio-stream.h"
+#include "audio-pcm.h"
 #include "audio-recorder-interface.h"
 
 #include <thread>
@@ -43,9 +51,9 @@ using namespace android;
 
 class AudioRecorder : public IAudioRecorder {
 public:
-  AudioRecorder(std::string audiodev,
-                AudioRecorderConfig config,
-                IAudioRecorderCallback *callback);
+  AudioRecorder(std::string audiodevcapture,
+                std::string audiodevplayback,
+                AudioDirection audiodirection);
   ~AudioRecorder();
 
   int32_t Start() override;
@@ -53,19 +61,24 @@ public:
 
 private:
   void AudioThreadHandler();
-  pcm_format AudioRecorderToPcmFormat(AudioFormat format);
-  int32_t SetMixerConfiguration(struct mixer *mixer);
-  int32_t MixerRelease(struct mixer *mixer);
+  int32_t SetMixerConfiguration(struct mixer *mixer,
+                                AudioDirection audiodirection);
+  int32_t MixerRelease(struct mixer *mixer, AudioDirection audiodirection);
+  int32_t GetPcmCardDetails(std::string mAudioDev, unsigned int &pcm_card,
+                            unsigned int &pcm_dev);
 
-  std::string mAudioDev;
-  AudioRecorderConfig mConfig;
-  struct pcm *mPcm;
+  std::string mAudioDevCapture;
+  std::string mAudioDevPlayback;
+  struct pcm *mPcmCaptureHandle;
+  struct pcm *mPcmPlaybackHandle;
   struct mixer *mMixer;
+  AudioDirection mAudioDirection;
   std::unique_ptr<std::thread> mThread;
   std::atomic<bool> mRecording;
   size_t mBufSize;
-  IAudioRecorderCallback *mCallback;
   std::unique_ptr<AudioStream> mAudioStream;
+  std::unique_ptr<PcmNode> mPcmNodeCapture;
+  std::unique_ptr<PcmNode> mPcmNodePlayback;
   std::mutex mMutex;
   int32_t mErrorCode;
 };
