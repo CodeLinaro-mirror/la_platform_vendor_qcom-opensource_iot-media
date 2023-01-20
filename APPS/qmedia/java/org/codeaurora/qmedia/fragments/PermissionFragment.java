@@ -25,6 +25,11 @@
 # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Changes from Qualcomm Innovation Center are provided under the following license:
+
+# Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
 package org.codeaurora.qmedia.fragments;
@@ -48,7 +53,8 @@ public class PermissionFragment extends Fragment {
             "android.permission.READ_EXTERNAL_STORAGE",
             "android.permission.RECORD_AUDIO",
             "android.permission.WRITE_EXTERNAL_STORAGE",
-            "android.permission.CAMERA"};
+            "android.permission.CAMERA",
+            "android.permission.MODIFY_AUDIO_SETTINGS"};
 
 
     public PermissionFragment() {

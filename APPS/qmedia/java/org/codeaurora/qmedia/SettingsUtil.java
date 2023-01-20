@@ -27,7 +27,7 @@
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Changes from Qualcomm Innovation Center are provided under the following license:
-# Copyright (c) 2022 Qualcomm Innovation Center, Inc.
+# Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted (subject to the limitations in the
@@ -88,12 +88,17 @@ class SettingsData {
     protected Boolean isReprocEnabled;
     protected Boolean isRecorderEnabled;
     protected Boolean isTunnelingEnabled;
+
+}
+
+class AudioCalibrationData {
+    protected Boolean isCalibrationEnabled;
 }
 
 public class SettingsUtil {
 
     private static final String TAG = "SettingsUtil";
-
+    public AudioCalibrationData mAudioCalibrationData;
     public ArrayList<SettingsData> data;
     private static final CameraCharacteristics.Key<String> CAMERA_TYPE_CHARACTERISTIC_KEY =
             new CameraCharacteristics.Key<>("camera.type", String.class);
@@ -101,6 +106,7 @@ public class SettingsUtil {
     public SettingsUtil(Context context) {
         Log.v(TAG, "SettingsUtil enter");
         data = new ArrayList<>();
+        mAudioCalibrationData = new AudioCalibrationData();
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(context);
         CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
 
@@ -226,6 +232,9 @@ public class SettingsUtil {
         hdmi_3_setting.isTunnelingEnabled = pref.getBoolean("hdmi_3_tunneling_enable", false);
 
         data.add(hdmi_3_setting);
+
+        mAudioCalibrationData.isCalibrationEnabled = pref.getBoolean("msteams_cert_calibration", false);
+
         Log.v(TAG, "SettingsUtil exit");
     }
 
@@ -246,6 +255,7 @@ public class SettingsUtil {
             Log.d(TAG, "Is Tunneling Enabled : " + data.get(it).isTunnelingEnabled);
             Log.d(TAG, "#####################################");
         }
+        Log.d(TAG, "Is Audio Calibration Enabled : " + mAudioCalibrationData.isCalibrationEnabled);
     }
 
     public String getHDMISource(int index) {
@@ -298,5 +308,9 @@ public class SettingsUtil {
 
     public Boolean getIsTunnelingEnabled(int index) {
         return data.get(index).isTunnelingEnabled;
+    }
+
+    public Boolean getIsCalibrationEnabled() {
+        return mAudioCalibrationData.isCalibrationEnabled;
     }
 }
