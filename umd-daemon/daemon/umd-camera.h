@@ -29,7 +29,7 @@
 
  /*
  # Changes from Qualcomm Innovation Center are provided under the following license :
- # Copyright(c) 2022 Qualcomm Innovation Center, Inc.
+ # Copyright(c) 2022-2023 Qualcomm Innovation Center, Inc.
  #
  # Redistributionand use in sourceand binary forms, with or without
  # modification, are permitted(subject to the limitations in the
@@ -95,42 +95,42 @@ enum class UmdCameraMessage {
 };
 
 struct UVCControlValues {
-  umd_brightness_t      brightness_min;
-  umd_brightness_t      brightness_max;
-  umd_brightness_t      brightness_def;
-  umd_contrast_t        contrast_min;
-  umd_contrast_t        contrast_max;
-  umd_contrast_t        contrast_def;
-  umd_saturation_t      saturation_min;
-  umd_saturation_t      saturation_max;
-  umd_saturation_t      saturation_def;
-  umd_sharpness_t       sharpness_min;
-  umd_sharpness_t       sharpness_max;
-  umd_sharpness_t       sharpness_def;
-  umd_antibanding_t     antibanding_def;
-  umd_antibanding_t     antibanding_min;
-  umd_antibanding_t     antibanding_max;
-  umd_backlight_comp_t  backlight_comp_min;
-  umd_backlight_comp_t  backlight_comp_max;
-  umd_backlight_comp_t  backlight_comp_def;
-  umd_gain_t            gain_min;
-  umd_gain_t            gain_max;
-  umd_gain_t            gain_def;
-  umd_wb_temp_t         wb_temp_min;
-  umd_wb_temp_t         wb_temp_max;
-  umd_wb_temp_t         wb_temp_def;
-  umd_wb_mode_t         wb_mode_def;
-  umd_exp_time_t        exp_time_min;
-  umd_exp_time_t        exp_time_max;
-  umd_exp_time_t        exp_time_def;
-  umd_exp_mode_t        exp_mode_def;
-  umd_exp_focus_mode_t  exp_focus_mode_def;
-  umd_zoom_t            zoom_min;
-  umd_zoom_t            zoom_max;
-  umd_zoom_t            zoom_def;
-  umd_pan_tilt_t        pan_tilt_min;
-  umd_pan_tilt_t        pan_tilt_max;
-  umd_pan_tilt_t        pan_tilt_def;
+  int16_t   brightness_min;
+  int16_t   brightness_max;
+  int16_t   brightness_def;
+  uint16_t  contrast_min;
+  uint16_t  contrast_max;
+  uint16_t  contrast_def;
+  uint16_t  saturation_min;
+  uint16_t  saturation_max;
+  uint16_t  saturation_def;
+  uint16_t  sharpness_min;
+  uint16_t  sharpness_max;
+  uint16_t  sharpness_def;
+  uint8_t   antibanding_def;
+  uint8_t   antibanding_min;
+  uint8_t   antibanding_max;
+  uint16_t  backlight_comp_min;
+  uint16_t  backlight_comp_max;
+  uint16_t  backlight_comp_def;
+  uint16_t  gain_min;
+  uint16_t  gain_max;
+  uint16_t  gain_def;
+  uint16_t  wb_temp_min;
+  uint16_t  wb_temp_max;
+  uint16_t  wb_temp_def;
+  uint8_t   wb_mode_def;
+  uint32_t  exp_time_min;
+  uint32_t  exp_time_max;
+  uint32_t  exp_time_def;
+  uint8_t   exp_mode_def;
+  uint8_t   exp_focus_mode_def;
+  uint16_t  zoom_min;
+  uint16_t  zoom_max;
+  uint16_t  zoom_def;
+  uint64_t  pan_tilt_min;
+  uint64_t  pan_tilt_max;
+  uint64_t  pan_tilt_def;
 };
 
 class UmdCamera : public IAudioRecorderCallback, public RefBase {
@@ -147,7 +147,7 @@ private:
   static bool handleVideoControl(uint32_t id, uint32_t request, void * payload,
                                  void * userdata);
 
-  static umd_pan_tilt_t umd_current_pan_and_tilt;
+  static uint64_t umd_current_pan_and_tilt;
 
   uint32_t GetVendorTagByName (const char * section, const char * name);
 
@@ -178,7 +178,7 @@ private:
   void SetFocusMode (CameraMetadata & meta, uint8_t value);
   bool GetFocusMode (CameraMetadata & meta, uint8_t * value);
   void SetZoom(CameraMetadata & meta, uint16_t *magnification,
-      umd_pan_tilt_t *pan_and_tilt, UVCControlValues &ctrl_vals);
+      uint64_t *pan_and_tilt, UVCControlValues &ctrl_vals);
   void GetZoom(CameraMetadata & meta, uint16_t * magnification);
 
   void ErrorCb(CameraErrorCode errorCode,
@@ -229,7 +229,6 @@ private:
   IAllocDevice* mAllocDeviceInterface;
   CameraMetadata mStaticInfo;
   CameraClientCallbacks mClientCb;
-  CameraStreamParameters mStreamParams;
   Camera3Request mRequest;
 
   int64_t mLastFrameNumber;
@@ -243,4 +242,5 @@ private:
   std::unique_ptr<IAudioRecorder> mAudioRecorder;
 
   UVCControlValues mCtrlValues;
+  StreamRotation mRotation;
 };

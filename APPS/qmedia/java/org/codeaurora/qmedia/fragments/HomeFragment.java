@@ -27,7 +27,7 @@
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Changes from Qualcomm Innovation Center are provided under the following license:
-# Copyright (c) 2022 Qualcomm Innovation Center, Inc.
+# Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted (subject to the limitations in the
@@ -87,6 +87,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
+import android.media.AudioManager;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -265,6 +266,14 @@ public class HomeFragment extends Fragment implements CameraDisconnectedListener
         }
         displays[0].getRectSize(mPrimaryDisplaySize);
         mPrimaryDisplaySize.top = mPrimaryDisplaySize.top + navBarHeight;
+        AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (mSettingData.getIsCalibrationEnabled()) {
+            am.setParameters("msteams_cert_calibration=on");
+            Log.d(TAG, "MS Teams Audio Calibration is ON");
+        } else {
+            am.setParameters("msteams_cert_calibration=off");
+            Log.d(TAG, "MS Teams Audio Calibration is OFF");
+        }
         Log.v(TAG, "Exit onResume");
     }
 
