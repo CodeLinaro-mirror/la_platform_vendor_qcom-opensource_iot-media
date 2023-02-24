@@ -1,7 +1,5 @@
 IOT_MEDIA_PATH:= $(call my-dir)
 
-include $(IOT_MEDIA_PATH)/APPS/Android.mk
-
 # Enable AI Director test & SNPE Lib
 # AI_DIRECTOR := true
 
