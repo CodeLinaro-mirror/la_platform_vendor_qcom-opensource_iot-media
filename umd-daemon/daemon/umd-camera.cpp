@@ -83,7 +83,7 @@
 
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
-const uint32_t STREAM_BUFFER_COUNT = 4;
+const uint32_t STREAM_BUFFER_COUNT = 10;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
