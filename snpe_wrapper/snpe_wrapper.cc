@@ -35,6 +35,7 @@
 #include "snpe_wrapper.h"
 
 #include <utils/Log.h>
+#include <stdint.h>
 
 SNPEContext::SNPEContext(NetworkIO io_type, TensorType output_tensor_type)
     : max_num_objects_(0),
@@ -103,6 +104,18 @@ int32_t SNPEContext::ExecuteModel() {
 int32_t SNPEContext::LoadModel(std::string& model_path) {
   snpe_params_.container = LoadContainerFromFile(model_path);
   if (nullptr == snpe_params_.container) {
+    PrintErrorStringAndExit();
+    return -1;
+  }
+  return 0;
+}
+int32_t SNPEContext::LoadModel(
+  const uint8_t* buffer,
+  const size_t size
+) {
+  snpe_params_.container = zdl::DlContainer::
+      IDlContainer::open(buffer, size);
+  if (!snpe_params_.container) {
     PrintErrorStringAndExit();
     return -1;
   }
