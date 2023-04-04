@@ -715,16 +715,16 @@ void UmdCamera::SetZoom(CameraMetadata& meta, uint16_t* in_magnification,
   int32_t zoom_w = (sensor_w - sensor_x) / (magnification / 100.0);
   int32_t zoom_h = (sensor_h - sensor_y) / (magnification / 100.0);
 
-  uint64_t pan_min = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_min);
-  uint64_t pan_max = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_max);
+  int64_t pan_min = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_min);
+  int64_t pan_max = UMD_VIDEO_CTRL_GET_PAN(ctrl_vals.pan_tilt_max);
 
   float pan_steps = (pan_max - pan_min) / 2.0;
 
   int32_t zoom_x = ((sensor_w - sensor_x) - zoom_w) / 2;
   zoom_x += (zoom_x * pan) / pan_steps;
 
-  uint64_t tilt_min = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_min);
-  uint64_t tilt_max = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_max);
+  int64_t tilt_min = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_min);
+  int64_t tilt_max = UMD_VIDEO_CTRL_GET_TILT(ctrl_vals.pan_tilt_max);
   float tilt_steps = (tilt_max - tilt_min) / 2.0;
 
   int32_t zoom_y = ((sensor_h - sensor_y) - zoom_h) / 2;
