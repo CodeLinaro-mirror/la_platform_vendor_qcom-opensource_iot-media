@@ -5,6 +5,14 @@ include $(CLEAR_VARS)
 LOCAL_MODULE = umd-daemon
 LOCAL_PROPRIETARY_MODULE := true
 
+ifeq ($(TARGET_BOARD_PLATFORM),kona)
+LOCAL_CFLAGS += -DTARGET_KONA
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM),lahaina)
+LOCAL_CFLAGS += -DTARGET_LAHAINA
+endif
+
 LOCAL_SRC_FILES := umd-camera.cpp \
                    audio-recorder.cpp \
                    audio-stream.cpp \

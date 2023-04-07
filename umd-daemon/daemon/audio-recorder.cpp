@@ -280,6 +280,7 @@ int32_t AudioRecorder::SetMixerConfiguration(struct mixer *mixer,
       return ret;
     }
   } else {
+#ifdef TARGET_KONA
     ctl = mixer_get_ctl_by_name(mixer, "QUAT_MI2S_RX Audio Mixer MultiMedia1");
     if (ctl == nullptr) {
       return -ENODEV;
@@ -289,6 +290,149 @@ int32_t AudioRecorder::SetMixerConfiguration(struct mixer *mixer,
     if (ret) {
       return ret;
     }
+#endif
+
+#ifdef TARGET_LAHAINA
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_CDC_DMA_RX_0 Channels");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "Two");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA RX0 MUX");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "AIF1_PB");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA RX1 MUX");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "AIF1_PB");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_RX0 INP0");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "RX0");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_RX1 INP0");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "RX1");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_COMP1 Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_COMP2 Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrLeft COMP Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrLeft VISENSE Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrLeft SWR DAC_Port Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrRight COMP Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrRight VISENSE Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrRight SWR DAC_Port Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_CDC_DMA_RX_0 Audio Mixer MultiMedia1");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 1);
+    if (ret) {
+      return ret;
+    }
+#endif
   }
 
   return 0;
@@ -329,6 +473,7 @@ int32_t AudioRecorder::MixerRelease(struct mixer *mixer,
       return ret;
     }
   } else {
+#ifdef TARGET_KONA
     ctl = mixer_get_ctl_by_name(mixer, "QUAT_MI2S_RX Audio Mixer MultiMedia1");
     if (ctl == nullptr) {
       return -ENODEV;
@@ -338,6 +483,149 @@ int32_t AudioRecorder::MixerRelease(struct mixer *mixer,
     if (ret) {
       return ret;
     }
+#endif
+
+#ifdef TARGET_LAHAINA
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_CDC_DMA_RX_0 Channels");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "One");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA RX0 MUX");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "ZERO");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA RX1 MUX");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "ZERO");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_RX0 INP0");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "ZERO");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_RX1 INP0");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_enum_by_string(ctl, "ZERO");
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_COMP1 Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_COMP2 Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrLeft COMP Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrLeft VISENSE Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrLeft SWR DAC_Port Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrRight COMP Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrRight VISENSE Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "SpkrRight SWR DAC_Port Switch");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+
+    ctl = mixer_get_ctl_by_name(mixer, "WSA_CDC_DMA_RX_0 Audio Mixer MultiMedia1");
+    if (ctl == nullptr) {
+      return -ENODEV;
+    }
+
+    ret = mixer_ctl_set_value(ctl, 0, 0);
+    if (ret) {
+      return ret;
+    }
+#endif
   }
 
   return 0;
