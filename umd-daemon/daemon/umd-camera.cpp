@@ -88,8 +88,7 @@ const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
 
-UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
-                     int cameraId, std::string speakerdev)
+UmdCamera::UmdCamera(std::string uvcdev,int cameraId)
   : mGadget(nullptr),
     mVsetup({}),
     mUmdVideoCallbacks({
@@ -98,78 +97,33 @@ UmdCamera::UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
         UmdCamera::disableVideoStream,
         UmdCamera::handleVideoControl}),
     mUvcDev(uvcdev),
-    mUacDev(uacdev),
-    mMicDev(micdev),
-    mSpeakerDev(speakerdev),
     mCameraId(cameraId),
     mStreamId(-1),
     mActive(false),
-    mOnlyUAC(false),
     mRequestId(-1),
     mDeviceClient(nullptr),
     mAllocDeviceInterface(nullptr),
     mClientCb({}),
     mLastFrameNumber(-1),
     mVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
-    mAudioPlayback(nullptr),
-    mAudioCapture(nullptr),
     mCtrlValues({}),
     mRotation(StreamRotation::ROTATION_0) {}
 
-UmdCamera::~UmdCamera() {
+UmdCamera::~UmdCamera() {}
 
-  mMsg.push(UmdCameraMessage::CAMERA_TERMINATE);
-  mActive = false;
-
-  if (mCameraThread) {
-    mCameraThread->join();
-  }
-
-  if (mAudioPlayback)
-    mAudioPlayback->Stop();
-
-  if (mAudioCapture)
-    mAudioCapture->Stop();
-
-  if (mGadget != nullptr)
-    umd_gadget_free (mGadget);
-
-  if (nullptr != mAllocDeviceInterface) {
-    AllocDeviceFactory::DestroyAllocDevice(mAllocDeviceInterface);
-  }
-
-}
-
-int32_t UmdCamera::Initialize() {
-
+int32_t UmdCamera::StartUVC() {
   int32_t res = -1;
-
-  if (mUvcDev.empty() && mUacDev.empty()) {
-    UMD_LOG_ERROR("Select atleast UVC or UAC or both!\n");
-    return -ENODEV;
-  }
-
   if (!mUvcDev.empty()) {
     res = InitializeCamera();
     if (res != 0) {
       printf("InitializeCamera() failed. res: %d\n", res);
       return -ENODEV;
     }
-  } else {
-    mOnlyUAC = true;
-  }
-
-  if (!mUacDev.empty()) {
-    res = InitializeAudio();
-    if (res != 0) {
-      printf("InitializeAudio() failed. res: %d\n", res);
-      return -ENODEV;
-    }
   }
 
   mGadget = umd_gadget_new(mUvcDev.empty() ? nullptr : mUvcDev.c_str(),
       nullptr, &mUmdVideoCallbacks, this);
-  if (nullptr == mGadget && !mUvcDev.empty()) {
+  if (nullptr == mGadget) {
     UMD_LOG_ERROR ("Failed to create UMD gadget!\n");
     return -ENODEV;
   }
@@ -182,24 +136,22 @@ int32_t UmdCamera::Initialize() {
     return -ENOMEM;
   }
 
-  if (!mUacDev.empty()) {
-    if (!mMicDev.empty()) {
-      res = mAudioPlayback->Start();
-      if (res != 0) {
-        UMD_LOG_ERROR("Failed to start audio recorder!\n");
-        return res;
-      }
-    }
-    if (!mSpeakerDev.empty()) {
-      res = mAudioCapture->Start();
-      if (res != 0) {
-        UMD_LOG_ERROR("Failed to start audio recorder!\n");
-        return res;
-      }
-    }
+  return 0;
+}
+
+void UmdCamera::StopUVC() {
+  mMsg.push(UmdCameraMessage::CAMERA_TERMINATE);
+  mActive = false;
+  if (mCameraThread) {
+    mCameraThread->join();
   }
 
-  return 0;
+  if (mGadget != nullptr)
+    umd_gadget_free (mGadget);
+
+  if (nullptr != mAllocDeviceInterface) {
+    AllocDeviceFactory::DestroyAllocDevice(mAllocDeviceInterface);
+  }
 }
 
 int32_t UmdCamera::InitializeCamera() {
@@ -280,30 +232,6 @@ int32_t UmdCamera::InitializeCamera() {
   }
 
   FillInitialControlValue();
-
-  return 0;
-}
-
-int32_t UmdCamera::InitializeAudio() {
-  if (!mMicDev.empty()) {
-    mAudioPlayback = std::unique_ptr<AudioRecorder>(
-        new AudioRecorder(mMicDev.c_str(), mUacDev.c_str(), AUDIO_DEVICE_TO_HOST));
-
-    if (mAudioPlayback == nullptr) {
-      UMD_LOG_ERROR("AudioPlayback creation failed!\n");
-      return -ENOMEM;
-    }
-  }
-
-  if (!mSpeakerDev.empty()) {
-    mAudioCapture = std::unique_ptr<AudioRecorder>(
-        new AudioRecorder(mUacDev.c_str(), mSpeakerDev.c_str(), AUDIO_HOST_TO_DEVICE));
-
-    if (mAudioCapture == nullptr) {
-      UMD_LOG_ERROR("AudioCapture creation failed!\n");
-      return -ENOMEM;
-    }
-  }
 
   return 0;
 }

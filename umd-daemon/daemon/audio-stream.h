@@ -48,6 +48,7 @@
 #include "audio-recorder-interface.h"
 #include <tinyalsa/asoundlib.h>
 #include "audio-pcm.h"
+#include "umd-util.h"
 
 enum AudioCallbackMsgType {
   AUDIO_CALLBACK_MSG_NONE,
@@ -64,7 +65,12 @@ struct AudioCallbackMsg {
 class AudioStream : public android::RefBase {
  public:
   AudioStream(uint32_t buffer_size, uint32_t buffers_count,
-              std::unique_ptr<PcmNode> & mPcmNode);
+              std::unique_ptr<PcmNode> &mPcmNodePlayback,
+              AudioDirection audiodirection);
+  AudioStream(uint32_t buffer_size, uint32_t buffers_count,
+              std::unique_ptr<PcmNode> &mPcmNodePlayback,
+              AudioDirection audiodirection,
+              AudioCallback cb);
   ~AudioStream();
 
   int32_t Init();
@@ -90,4 +96,6 @@ class AudioStream : public android::RefBase {
   std::unique_ptr<std::thread> mThread;
   MessageQ<AudioCallbackMsg> mMsg;
   std::unique_ptr<PcmNode> & mPcmNode;
+  AudioDirection mAudioDirection;
+  AudioCallback mCallback;
 };
