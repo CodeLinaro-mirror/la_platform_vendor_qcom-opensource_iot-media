@@ -29,10 +29,11 @@ class UmdAudio {
   ~UmdAudio();
 
   int32_t Init();
-  int32_t StartUAC();
-  void StopUAC();
+  int32_t Start();
+  void Stop();
   void SetBufSize(size_t bufSize);
-  int32_t SubmitBuf(uint8_t *data);
+  int32_t SubmitBuffer(uint8_t *data);
+  bool GetUmdStatus();
 
  private:
   void AudioThreadHandler();
@@ -49,4 +50,5 @@ class UmdAudio {
   std::unique_ptr<PcmNode> mPcmNode;
   std::mutex mMutex;
   AudioCallback mCallback;
+  std::atomic<bool> mStatus;
 };

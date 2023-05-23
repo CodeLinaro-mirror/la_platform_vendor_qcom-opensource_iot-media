@@ -76,8 +76,8 @@ static void uevent_event(UeventData *payload, EventCallback uevent_cb,
     AudioState newstate = get_audio_client_status();
     if (payload->cur != newstate) {
       payload->cur = newstate;
+      UMD_LOG_INFO("Sending audio uevent with state %d\n", payload->cur);
       umd_event_cb(payload->cur, uevent_cb);
-      UMD_LOG_INFO("\nSending audio uevent with state %d\n", payload->cur);
     }
   }
 }

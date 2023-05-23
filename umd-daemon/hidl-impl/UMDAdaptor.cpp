@@ -10,7 +10,7 @@
 #include "umd-logging.h"
 #include "umd.h"
 
-#define LOG_TAG "UMDAdaptor"
+#define LOG_TAG "UmdAdaptor"
 
 namespace vendor {
 namespace qti {

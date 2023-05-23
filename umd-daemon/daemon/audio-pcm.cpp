@@ -6,6 +6,8 @@
 #include "audio-pcm.h"
 #include "umd-util.h"
 
+#define LOG_TAG "AudioPCM"
+
 const uint32_t UAC_PLAYBACK_SAMPLE_RATE = 48000;
 const uint32_t UAC_CAPTURE_SAMPLE_RATE = 44100;
 const uint32_t UAC_AUDIO_PERIOD_SIZE = 1024;

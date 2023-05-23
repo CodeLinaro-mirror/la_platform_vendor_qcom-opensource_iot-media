@@ -17,9 +17,9 @@ UmdAudio::UmdAudio(std::string audiodev,
       mPcmHandle(nullptr),
       mAudioDirection(audiodirection),
       mThread(nullptr),
-      mRecording(false),
       mBufSize(0),
-      mAudioStream(nullptr) {}
+      mAudioStream(nullptr),
+      mStatus(false) {}
 
 UmdAudio::UmdAudio(std::string audiodev,
                    AudioDirection audiodirection,
@@ -31,7 +31,8 @@ UmdAudio::UmdAudio(std::string audiodev,
       mRecording(false),
       mBufSize(0),
       mAudioStream(nullptr),
-      mCallback(cb) {}
+      mCallback(cb),
+      mStatus(false) {}
 
 UmdAudio::~UmdAudio() {}
 
@@ -66,11 +67,12 @@ int32_t UmdAudio::Init() {
   return 0;
 }
 
-int32_t UmdAudio::StartUAC() {
-  UMD_LOG_INFO("Start UAC");
-  const std::lock_guard<std::mutex> lock(mMutex);
+int32_t UmdAudio::Start() {
+  if (mStatus)
+    return 0;
 
   if (mAudioDirection == AUDIO_HOST_TO_DEVICE) {
+    UMD_LOG_INFO("Start UAC - AUDIO_HOST_TO_DEVICE");
     mBufSize = mPcmNode->GetBufferSize();
     if (mBufSize == 0) {
       UMD_LOG_ERROR("Invalid audio buffer size!\n");
@@ -80,6 +82,7 @@ int32_t UmdAudio::StartUAC() {
         new AudioStream(mBufSize, AUDIO_BUFFERS_COUNT, mPcmNode,
                         mAudioDirection, mCallback));
   } else {
+    UMD_LOG_INFO("Start UAC - AUDIO_DEVICE_TO_HOST");
     mAudioStream = std::unique_ptr<AudioStream>(
         new AudioStream(mBufSize, AUDIO_BUFFERS_COUNT, mPcmNode,
                         mAudioDirection));
@@ -108,7 +111,32 @@ int32_t UmdAudio::StartUAC() {
       return -ENOMEM;
     }
   }
+
+  mStatus = true;
   return 0;
+}
+
+void UmdAudio::Stop() {
+  if (!mStatus)
+    return;
+
+  mStatus = false;
+
+  if (mAudioDirection == AUDIO_HOST_TO_DEVICE) {
+    UMD_LOG_INFO("Stop UAC - AUDIO_HOST_TO_DEVICE");
+    mRecording = false;
+    if (mThread != nullptr) {
+      mThread->join();
+      mThread = nullptr;
+    }
+  } else {
+    UMD_LOG_INFO("Stop UAC - AUDIO_DEVICE_TO_HOST");
+  }
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    mAudioStream.reset();
+    mAudioStream = nullptr;
+  }
 }
 
 void UmdAudio::SetBufSize(size_t bufSize) {
@@ -133,23 +161,10 @@ int32_t UmdAudio::GetPcmCardDetails(std::string mAudioDev,
   return 0;
 }
 
-void UmdAudio::StopUAC() {
-  const std::lock_guard<std::mutex> lock(mMutex);
-  mRecording = false;
-  if (mAudioDirection == AUDIO_HOST_TO_DEVICE) {
-    if (mThread != nullptr) {
-      mThread->join();
-      mThread = nullptr;
-    }
-  }
-
-  mAudioStream.reset();
-  mAudioStream = nullptr;
-}
-
 void UmdAudio::AudioThreadHandler() {
   while (mRecording) {
     AudioBuffer *buffer;
+    const std::lock_guard<std::mutex> lock(mMutex);
     int32_t res = mAudioStream->GetBuffer(&buffer);
     if (res) {
       UMD_LOG_ERROR("Audio stream get buffer failed.\n");
@@ -177,19 +192,20 @@ void UmdAudio::AudioThreadHandler() {
   }
 }
 
-int32_t UmdAudio::SubmitBuf(uint8_t *data) {
+int32_t UmdAudio::SubmitBuffer(uint8_t *data) {
   AudioBuffer *buffer = nullptr;
-  if (mAudioStream) {
-    int32_t res = mAudioStream->GetBuffer(&buffer);
-    if (!buffer)
-      return 0;
-    if (res) {
-      UMD_LOG_ERROR("Audio stream get buffer failed.\n");
-      return -1;
-    }
-    memcpy(buffer->data, data, mBufSize);
-    buffer->size = mBufSize;
-    mAudioStream->SubmitBuffer(buffer);
+  const std::lock_guard<std::mutex> lock(mMutex);
+  int32_t res = mAudioStream->GetBuffer(&buffer);
+  if (res) {
+    UMD_LOG_ERROR("Audio stream get buffer failed.\n");
+    return -1;
   }
+  memcpy(buffer->data, data, mBufSize);
+  buffer->size = mBufSize;
+  mAudioStream->SubmitBuffer(buffer);
   return 0;
+}
+
+bool UmdAudio::GetUmdStatus() {
+  return mStatus;
 }

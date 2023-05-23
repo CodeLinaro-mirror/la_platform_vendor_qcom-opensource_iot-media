@@ -18,8 +18,6 @@ std::unique_ptr<UmdUtil> umdUtil;
 std::unique_ptr<std::thread> audioThread;
 
 bool audioActive = false;
-static bool audioPlaybackStatus = false;
-static bool audioCaptureStatus = false;
 const int32_t CAM_ID = 0;
 const std::string UVC_DEV = "/dev/video2";
 const std::string HOST_DEV = "hw:1,0";
@@ -71,45 +69,33 @@ void set_buffersize(size_t bufSize) {
 }
 
 int32_t submit_buffer(uint8_t *data) {
-  int32_t res = audioPlayback->SubmitBuf(data);
-  if (res) {
-    UMD_LOG_ERROR("Submit buffer to umd-audio failed!\n");
-    return res;
+  if (audioPlayback->GetUmdStatus()) {
+    int32_t res = audioPlayback->SubmitBuffer(data);
+    if (res) {
+      UMD_LOG_ERROR("Submit buffer to umd-audio failed!\n");
+      return res;
+    }
   }
   return 0;
-}
-
-void modify_state(std::unique_ptr<UmdAudio> &ptr, bool &statusFlag, State state) {
-  if (ptr == nullptr)
-    return;
-
-  if (state == START && !statusFlag) {
-    ptr->StartUAC();
-    statusFlag = true;
-  }
-  if (state == STOP && statusFlag) {
-    ptr->StopUAC();
-    statusFlag = false;
-  }
 }
 
 void change_audio_status(AudioState newstate, EventCallback uevent_cb) {
   switch (newstate) {
     case AUDIO_STATE_PAUSED:
-      modify_state(audioPlayback, audioPlaybackStatus, STOP);
-      modify_state(audioCapture, audioCaptureStatus, STOP);
+      audioPlayback->Stop();
+      audioCapture->Stop();
       break;
     case AUDIO_STATE_CAPTURE:
-      modify_state(audioPlayback, audioPlaybackStatus, STOP);
-      modify_state(audioCapture, audioCaptureStatus, START);
+      audioPlayback->Stop();
+      audioCapture->Start();
       break;
     case AUDIO_STATE_PLAYBACK:
-      modify_state(audioPlayback, audioPlaybackStatus, START);
-      modify_state(audioCapture, audioCaptureStatus, STOP);
+      audioPlayback->Start();
+      audioCapture->Stop();
       break;
     case AUDIO_STATE_PLAYBACK_CAPTURE:
-      modify_state(audioPlayback, audioPlaybackStatus, START);
-      modify_state(audioCapture, audioCaptureStatus, START);
+      audioPlayback->Start();
+      audioCapture->Start();
       break;
   }
   uevent_cb(newstate);
