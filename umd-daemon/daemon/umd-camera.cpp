@@ -87,6 +87,7 @@ const uint32_t STREAM_BUFFER_COUNT = 10;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
+uint32_t umd_latency_log;
 
 UmdCamera::UmdCamera(std::string uvcdev,int cameraId)
   : mGadget(nullptr),
@@ -107,7 +108,9 @@ UmdCamera::UmdCamera(std::string uvcdev,int cameraId)
     mLastFrameNumber(-1),
     mVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
     mCtrlValues({}),
-    mRotation(StreamRotation::ROTATION_0) {}
+    mRotation(StreamRotation::ROTATION_0) {
+  GET_LATENCY_LOGS();
+}
 
 UmdCamera::~UmdCamera() {}
 
@@ -1102,6 +1105,8 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
   MemAllocFlags usage;
   MemAllocError ret;
 
+  UMD_LATENCY_LOG("UmdCamera-latency: FrameNumber: %d Buffer from HAL\n",
+      buffer.frame_number);
   if (mActive) {
     usage.flags = IMemAllocUsage::kSwReadOften;
     ret = mAllocDeviceInterface->MapBuffer(
@@ -1130,6 +1135,8 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
         break;
     }
 
+    UMD_LATENCY_LOG("UmdCamera-latency: FrameNumber: %d fd: %d Submit buffer " \
+        "to UMD \n", buffer.frame_number, buffer.fd);
     uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
         mapped_buffer, size, maxsize, buffer.timestamp);
     if (bufidx < 0) {
@@ -1190,7 +1197,8 @@ void UmdCamera::videoBufferLoop() {
       StreamBuffer buffer = buffer_pair.first;
       int32_t bufidx = buffer_pair.second;
       umd_gadget_wait_buffer (mGadget, UMD_VIDEO_STREAM_ID, bufidx);
-
+      UMD_LATENCY_LOG ("UmdCamera-latency: FrameNumber: %d fd: %d Return buffer" \
+          " from UMD \n", buffer.frame_number, buffer.fd);
       if (buffer.handle == nullptr) {
         UMD_LOG_ERROR("Invalid buffer handle\n");
         continue;
