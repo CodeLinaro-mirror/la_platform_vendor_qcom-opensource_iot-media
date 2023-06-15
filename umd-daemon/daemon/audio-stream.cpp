@@ -42,11 +42,24 @@
 #define LOG_TAG "AudioStream"
 
 AudioStream::AudioStream(uint32_t buffer_size, uint32_t buffers_count,
-                         std::unique_ptr<PcmNode> & mPcmNodePlayback)
+                         std::unique_ptr<PcmNode> & mPcmNodePlayback,
+                         AudioDirection audiodirection)
   : mBufferSize(buffer_size),
     mBuffersCount(buffers_count),
     mThread(nullptr),
-    mPcmNode(mPcmNodePlayback) {}
+    mPcmNode(mPcmNodePlayback),
+    mAudioDirection(audiodirection) {}
+
+AudioStream::AudioStream(uint32_t buffer_size, uint32_t buffers_count,
+                         std::unique_ptr<PcmNode> & mPcmNodePlayback,
+                         AudioDirection audiodirection,
+                         AudioCallback cb)
+  : mBufferSize(buffer_size),
+    mBuffersCount(buffers_count),
+    mThread(nullptr),
+    mPcmNode(mPcmNodePlayback),
+    mAudioDirection(audiodirection),
+    mCallback(cb) {}
 
 AudioStream::~AudioStream() {
   AudioCallbackMsg msg{};
@@ -139,8 +152,17 @@ void AudioStream::StreamLoopHandler() {
     mMsg.pop(msg);
     switch(msg.type) {
       case AUDIO_CALLBACK_MSG_SUBMIT:
-        if (mPcmNode->Write(msg.buffer) < 0)
-          UMD_LOG_ERROR ("Failed to write buffer! \n");
+        if (mAudioDirection == AUDIO_HOST_TO_DEVICE) {
+          if (msg.buffer->data) {
+            std::vector<uint8_t> data(msg.buffer->data, msg.buffer->data + msg.
+              buffer->size);
+            mCallback(data);
+          }
+        } else {
+          if (mPcmNode->Write(msg.buffer) < 0) {
+            UMD_LOG_ERROR("Failed to write buffer! \n");
+          }
+        }
         mMutex.lock();
         if (mBuffersMap.find(msg.buffer) != mBuffersMap.end()) {
           mBuffersMap.erase(msg.buffer);

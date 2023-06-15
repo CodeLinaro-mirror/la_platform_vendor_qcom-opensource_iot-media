@@ -1,0 +1,63 @@
+**Refer to the following document to get SNPE SDK: https://developer.qualcomm.com/sites/default/files/docs/snpe/index.html**
+
+**Refer to Main Release Notes for directory structure and Chip code**
+
+## Enabling AI Director and SNPE wrapper
+
+1. In the files: 'Android.mk' & 'iot-media-system.mk' present in the path '<workspace>/vendor/qcom/opensource/iot-media',
+   uncomment the below line:
+   ```bash
+   # AI_DIRECTOR := true
+   ```
+
+2. In '<workspace>/vendor/qcom/opensource/iot-media/snpe_wrapper/Android.mk', set the SNPE_SDK variable to the snpe version used.
+   Below is the default value set.
+   ```bash
+   SNPE_SDK := snpe-1.55.0.2958
+   ```
+
+2. Extract SNPE SDK archive in '<workspace>/vendor/qcom/opensource/iot-media/snpe_wrapper/snpe_lib/'
+   ```bash
+   ├── snpe_lib
+   │   ├── Android.mk
+   │   └── snpe-1.55.0.2958
+   ```
+
+3. Once changes are made, build Android images as usual and flash them onto the device
+
+4. After the first boot, perform following steps in order to enable AI Director & SNPE:
+   - Run the pre-requisites
+     ```bash
+     adb root
+     adb disable-verity
+     adb reboot
+     adb wait-for-device
+     adb root
+     adb remount
+     ```
+
+   - Sideload SNPE libraries
+     ```bash
+     adb push snpe-1.55.0.2958/lib/aarch64-android-clang6.0/* /vendor/lib64/
+     adb push snpe-1.55.0.2958/lib/dsp/* /vendor/lib/rfsa/adsp/
+     ```
+
+   - For Single camera use-case, run the following commands:
+     ```bash
+     adb shell "echo outputFormat=0 > /vendor/etc/camera/camxoverridesettings.txt"
+     adb shell "echo enableAIDirector=TRUE >> /vendor/etc/camera/camxoverridesettings.txt"
+     adb reboot
+     ```
+
+   - For 3 camera switch use-case, run the following commands:
+     ```bash
+     adb shell "echo outputFormat=0 > /vendor/etc/camera/camxoverridesettings.txt"
+     adb shell "echo enableAIDirector=TRUE >> /vendor/etc/camera/camxoverridesettings.txt"
+     adb shell "echo multiCameraEnable=TRUE >> /vendor/etc/camera/camxoverridesettings.txt"
+     adb shell "echo multiCameraEnableFront=TRUE >> /vendor/etc/camera/camxoverridesettings.txt"
+     adb shell "echo CameraIdforTeams=8 >> /vendor/etc/camera/camxoverridesettings.txt"
+     adb reboot
+     ```
+
+5. Once the above steps are done, use the QMedia App to exerise the use-case.
+   -  In the App, select camera-id as 0 for either single camera or 3 camera switch use-case.

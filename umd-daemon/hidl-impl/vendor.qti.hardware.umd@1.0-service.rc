@@ -1,0 +1,7 @@
+# Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+service vendor.umd-hal-1-0 /vendor/bin/hw/vendor.qti.hardware.umd@1.0-service
+    class hal
+    user system
+    group system wakelock uhid input
