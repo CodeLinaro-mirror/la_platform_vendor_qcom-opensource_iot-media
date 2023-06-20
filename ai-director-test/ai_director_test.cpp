@@ -129,7 +129,7 @@ int32_t AIDirectorTest::Initialize() {
                      &AIControlRoiCallback,
                      this);
 
-  if (res != STATUS_OK) {
+  if (res != AI_STATUS_OK) {
     UMD_LOG_ERROR ("Unable to initialize AI director. res: %d\n", res);
     return -ENODEV;
   }
@@ -214,7 +214,7 @@ void AIDirectorTest::processVideoLoop() {
     buff.roi = {0, 0, buff.width, buff.height};
 
     res = ai_ctrl_process(&buff);
-    if (res != STATUS_OK) {
+    if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("ai_ctrl_process failed: %d\n", ret);
     }
 
@@ -294,31 +294,31 @@ void AIDirectorTest::transformVideoLoop() {
     outbuf.plains[1].offset = mOutputBuffer.stride * mOutputBuffer.height;
 
     res = ai_ctrl_map_buffer(inbuf.vaddr, inbuf.fd, inbuf.size);
-    if (res != STATUS_OK) {
+    if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("ai_ctrl_map_buffer failed: %d\n", res);
       goto fail_unmap;
     }
 
     res = ai_ctrl_map_buffer(outbuf.vaddr, outbuf.fd, outbuf.size);
-    if (res != STATUS_OK) {
+    if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("ai_ctrl_map_buffer failed: %d\n", res);
       goto fail_unmap_inbuf;
     }
 
     res = ai_ctrl_transform(&inbuf, 1, &outbuf, &roi);
-    if (res != STATUS_OK) {
+    if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("ai_ctrl_transform failed: %d\n", res);
     }
 
     ProcessOutputBuffer(&outbuf);
 
     res = ai_ctrl_unmap_buffer(outbuf.fd);
-    if (res != STATUS_OK) {
+    if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("outbuf unmap failed: %d\n", res);
     }
 fail_unmap_inbuf:
     res = ai_ctrl_unmap_buffer(inbuf.fd);
-    if (res != STATUS_OK) {
+    if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("inbuf unmap failed: %d\n", res);
     }
 

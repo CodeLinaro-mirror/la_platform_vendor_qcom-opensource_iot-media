@@ -1,6 +1,8 @@
 # umd-daemon application to access camera and audio frames
 # and pass it on to UMD-Gadget module
-PRODUCT_PACKAGES += umd-daemon
+
+PRODUCT_PACKAGES += libumd-adaptor
+PRODUCT_PACKAGES += vendor.qti.hardware.umd@1.0-service
 
 ifeq ($(TARGET_BOARD_PLATFORM),kona)
 # AI Director test & SNPE Lib

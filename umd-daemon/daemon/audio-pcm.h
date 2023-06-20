@@ -9,6 +9,7 @@
 #include <tinyalsa/asoundlib.h>
 
 #include "audio-recorder-interface.h"
+#include "umd-logging.h"
 
 class PcmNode {
 public:
@@ -25,6 +26,7 @@ public:
   int IsReady();
   size_t GetBufferSize();
   int GetTimeStamp(unsigned int *avail, struct timespec *ts);
+  void PrintPcmNodeInfo();
 
 private:
   unsigned int mCard;

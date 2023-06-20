@@ -85,6 +85,7 @@ class SNPEContext : public ISNPEContext {
   ~SNPEContext();
 
   int32_t LoadModel(std::string& model_path) override;
+  int32_t LoadModel(const uint8_t* buffer, const size_t size) override;
   void ConfigureRuntime(uint32_t runtime) override;
   int32_t InitFramework() override;
   size_t GetNumberOfResultLayers() override;
