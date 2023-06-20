@@ -112,11 +112,6 @@ int32_t init_uac(AudioCallback cb) {
       UMD_LOG_ERROR("AudioPlayback creation failed!\n");
       return -ENOMEM;
     }
-    res = audioPlayback->Init();
-    if (res) {
-      UMD_LOG_ERROR("AudioPlayback init failed!\n");
-      return -1;
-    }
   }
 
   if (audioCapture == nullptr) {
@@ -125,11 +120,6 @@ int32_t init_uac(AudioCallback cb) {
     if (audioCapture == nullptr) {
       UMD_LOG_ERROR("AudioCapture creation failed!\n");
       return -ENOMEM;
-    }
-    res = audioCapture->Init();
-    if (res) {
-      UMD_LOG_ERROR("AudioCapture init failed!\n");
-      return -1;
     }
   }
   return 0;

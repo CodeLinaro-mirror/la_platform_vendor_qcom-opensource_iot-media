@@ -28,7 +28,6 @@ class UmdAudio {
            AudioCallback cb);
   ~UmdAudio();
 
-  int32_t Init();
   int32_t Start();
   void Stop();
   void SetBufSize(size_t bufSize);
