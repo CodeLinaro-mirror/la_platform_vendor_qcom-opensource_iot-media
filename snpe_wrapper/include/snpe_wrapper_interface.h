@@ -72,6 +72,7 @@ class ISNPEContext {
  public:
   virtual ~ISNPEContext() {}
   virtual int32_t LoadModel(std::string& model_path) = 0;
+  virtual int32_t LoadModel(const uint8_t* buffer, const size_t size) = 0;
   virtual void ConfigureRuntime(uint32_t runtime) = 0;
   virtual int32_t InitFramework() = 0;
   virtual size_t GetNumberOfResultLayers() = 0;

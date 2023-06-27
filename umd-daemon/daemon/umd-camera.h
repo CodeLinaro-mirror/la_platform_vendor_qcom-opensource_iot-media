@@ -74,7 +74,6 @@
 #include <memory>
 
 #include "message_queue.h"
-#include "audio-recorder.h"
 
 using namespace ::android;
 using namespace ::camera::adaptor;
@@ -135,11 +134,10 @@ struct UVCControlValues {
 
 class UmdCamera : public RefBase {
 public:
-  UmdCamera(std::string uvcdev, std::string uacdev, std::string micdev,
-            int cameraId, std::string speakerdev);
   ~UmdCamera();
-
-  int32_t Initialize();
+  UmdCamera(std::string uvcdev, int cameraId);
+  int32_t StartUVC();
+  void StopUVC();
 
 private:
   static bool setupVideoStream(UmdVideoSetup * stmsetup, void * userdata);
@@ -239,9 +237,6 @@ private:
 
   MessageQ<std::pair<StreamBuffer, int32_t>> mVideoBufferQueue;
   std::unique_ptr<std::thread> mVideoBufferThread;
-
-  std::unique_ptr<IAudioRecorder> mAudioPlayback;
-  std::unique_ptr<IAudioRecorder> mAudioCapture;
 
   UVCControlValues mCtrlValues;
   StreamRotation mRotation;

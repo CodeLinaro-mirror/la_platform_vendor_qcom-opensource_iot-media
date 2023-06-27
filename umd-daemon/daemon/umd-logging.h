@@ -27,10 +27,25 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
 #include <utils/Log.h>
+#include "umd-util.h"
 
+extern uint32_t umd_latency_log;
+const uint32_t DEFAULT_LATENCY_LOG_VALUE = 0;
+#define GET_LATENCY_LOGS()                                             \
+  ({                                                                   \
+    umd_latency_log = Property::Get("persist.vendor.umd.latency.log",  \
+    DEFAULT_LATENCY_LOG_VALUE);                                        \
+  })
 #define UMD_LOG_INFO(fmt, args...)  ALOGI(fmt, ##args)
 #define UMD_LOG_DEBUG(fmt, args...) ALOGD(fmt, ##args)
 #define UMD_LOG_ERROR(fmt, args...) ALOGE(fmt, ##args)
+#define UMD_LATENCY_LOG(fmt, args...) ALOGI_IF((umd_latency_log > 0), fmt, ##args)
