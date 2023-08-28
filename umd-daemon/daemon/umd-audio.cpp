@@ -36,7 +36,10 @@ UmdAudio::UmdAudio(std::string audiodev,
 
 UmdAudio::~UmdAudio() {}
 
-int32_t UmdAudio::Init() {
+int32_t UmdAudio::Start() {
+  if (mStatus)
+    return 0;
+
   unsigned int pcm_card, pcm_dev;
   int32_t result = GetPcmCardDetails(mAudioDev, pcm_card, pcm_dev);
   if (result) {
@@ -64,12 +67,6 @@ int32_t UmdAudio::Init() {
   } else {
     UMD_LOG_INFO("Pcm open success\n");
   }
-  return 0;
-}
-
-int32_t UmdAudio::Start() {
-  if (mStatus)
-    return 0;
 
   if (mAudioDirection == AUDIO_HOST_TO_DEVICE) {
     UMD_LOG_INFO("Start UAC - AUDIO_HOST_TO_DEVICE");
@@ -137,6 +134,11 @@ void UmdAudio::Stop() {
     mAudioStream.reset();
     mAudioStream = nullptr;
   }
+
+  mPcmNode->Close();
+  if(mPcmNode!=nullptr)
+    mPcmNode = nullptr;
+
 }
 
 void UmdAudio::SetBufSize(size_t bufSize) {

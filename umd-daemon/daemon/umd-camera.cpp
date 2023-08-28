@@ -125,7 +125,7 @@ int32_t UmdCamera::StartUVC() {
   }
 
   mGadget = umd_gadget_new(mUvcDev.empty() ? nullptr : mUvcDev.c_str(),
-      nullptr, &mUmdVideoCallbacks, this);
+      &mUmdVideoCallbacks, this);
   if (nullptr == mGadget) {
     UMD_LOG_ERROR ("Failed to create UMD gadget!\n");
     return -ENODEV;
