@@ -314,7 +314,7 @@ void AIDirectorTest::transformVideoLoop() {
       goto fail_unmap_inbuf;
     }
 
-    res = ai_ctrl_transform(&inbuf, 1, &outbuf, &roi);
+    res = ai_ctrl_transform(&inbuf, 1, &outbuf, &roi, 1);
     if (res != AI_STATUS_OK) {
       UMD_LOG_ERROR("ai_ctrl_transform failed: %d\n", res);
     }
@@ -589,11 +589,13 @@ void AIDirectorTest::ProcessOutputBuffer(ai_ctrl_buffer_t *outbuf) {
   frame_number++;
 }
 
-void AIDirectorTest::AIControlRoiCallback(void * usr_data, ai_ctrl_roi *roi) {
+void AIDirectorTest::AIControlRoiCallback(void * usr_data, ai_ctrl_roi *roi, int32_t roi_count) {
   UMD_LOG_INFO("%s\n", __func__);
 
   if (roi != nullptr) {
-    UMD_LOG_INFO("%s ROI x:%f, y:%f, width:%f, height:%f\n", __func__,
-        roi->x, roi->y, roi->width, roi->height);
+    for (int32_t i = 0; i < roi_count; i++) {
+      UMD_LOG_INFO("%s ROI x:%f, y:%f, width:%f, height:%f\n", __func__,
+          roi[i].x, roi[i].y, roi[i].width, roi[i].height);
+    }
   }
 }
