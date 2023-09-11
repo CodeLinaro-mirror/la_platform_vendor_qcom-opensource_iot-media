@@ -211,7 +211,10 @@ void AIDirectorTest::processVideoLoop() {
       buff.plains[i].offset = buffer.info.plane_info[i].offset;
     }
 
-    buff.roi = {0, 0, buff.width, buff.height};
+    buff.roi = { 0.0f,
+                 0.0f,
+                 static_cast<float>(buff.width),
+                 static_cast<float>(buff.height)};
 
     res = ai_ctrl_process(&buff);
     if (res != AI_STATUS_OK) {
@@ -264,7 +267,10 @@ void AIDirectorTest::transformVideoLoop() {
     inbuf.timestamp = buffer.timestamp;
     inbuf.format = BufferFormatToAIFormat(buffer.info.format);
     inbuf.num_of_planes = buffer.info.num_planes;
-    inbuf.roi = {0, 0, inbuf.width, inbuf.height};
+    inbuf.roi = { 0.0f,
+                  0.0f,
+                  static_cast<float>(inbuf.width),
+                  static_cast<float>(inbuf.height)};
 
     for (int i = 0; i < inbuf.num_of_planes; i++) {
       inbuf.plains[i].width = buffer.info.plane_info[i].width;
@@ -280,7 +286,10 @@ void AIDirectorTest::transformVideoLoop() {
     outbuf.fd = mOutputBuffer.fd;
     outbuf.timestamp = buffer.timestamp;
     outbuf.format = BufferFormatToAIFormat(mOutputBuffer.format);
-    outbuf.roi = {0, 0, outbuf.width, outbuf.height};
+    outbuf.roi = { 0.0f,
+                   0.0f,
+                   static_cast<float>(outbuf.width),
+                   static_cast<float>(outbuf.height)};
 
     outbuf.num_of_planes = 2;
     outbuf.plains[0].width = mOutputBuffer.width;
@@ -584,7 +593,7 @@ void AIDirectorTest::AIControlRoiCallback(void * usr_data, ai_ctrl_roi *roi) {
   UMD_LOG_INFO("%s\n", __func__);
 
   if (roi != nullptr) {
-    UMD_LOG_INFO("%s ROI x:%d, y:%d, width:%d, height:%d\n", __func__,
+    UMD_LOG_INFO("%s ROI x:%f, y:%f, width:%f, height:%f\n", __func__,
         roi->x, roi->y, roi->width, roi->height);
   }
 }
