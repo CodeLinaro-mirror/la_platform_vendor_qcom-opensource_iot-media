@@ -75,6 +75,13 @@
 
 #include "message_queue.h"
 
+#ifdef ENABLE_H264
+#include "c2-module.h"
+#endif
+
+typedef std::function<void(uint8_t* data, uint32_t size, uint64_t timestamp)>
+  UmdFrameCallback;
+
 using namespace ::android;
 using namespace ::camera::adaptor;
 using namespace ::camera;
@@ -192,6 +199,7 @@ private:
 
   void cameraThreadHandler();
   void videoBufferLoop();
+  void codecVideoBufferLoop();
 
   int32_t InitializeCamera();
   bool CameraStart();
@@ -207,6 +215,16 @@ private:
 
   uint32_t GetBlobSize(uint8_t *buffer, uint32_t size);
 
+  void SetEncoderParameters();
+  bool InitializeCodec();
+  void OnFrameAvailable(uint8_t* data, uint32_t size, uint64_t timestamp);
+  void PrintFPS();
+#ifdef ENABLE_H264
+  void SetParams (std::unique_ptr<C2Param> c2param, std::string type);
+  std::shared_ptr<C2Buffer> ImportGraphicBuffer(StreamBuffer buffer);
+
+  C2Module *mC2Module;
+#endif
   UmdGadget *mGadget;
   UmdVideoSetup mVsetup;
   UmdVideoCallbacks mUmdVideoCallbacks;
@@ -236,8 +254,15 @@ private:
   std::mutex mCameraMutex;
 
   MessageQ<std::pair<StreamBuffer, int32_t>> mVideoBufferQueue;
+  MessageQ<int32_t> mCodecVideoBufferQueue;
   std::unique_ptr<std::thread> mVideoBufferThread;
+  std::unique_ptr<std::thread> mCodecVideoBufferThread;
 
   UVCControlValues mCtrlValues;
   StreamRotation mRotation;
+
+  struct timespec mTv;
+  struct timespec mPrevtv;
+  int64_t mCount;
 };
+
