@@ -100,7 +100,7 @@ private:
   ai_ctrl_format_t BufferFormatToAIFormat(BufferFormat format);
   void ProcessOutputBuffer(ai_ctrl_buffer_t *outbuf);
 
-  static void AIControlRoiCallback(void * usr_data, ai_ctrl_roi *roi);
+  static void AIControlRoiCallback(void * usr_data, ai_ctrl_roi *roi, int32_t roi_count);
 
   int mCameraId;
   int mStreamId[2];
