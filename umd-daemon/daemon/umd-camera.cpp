@@ -1454,6 +1454,8 @@ bool UmdCamera::CameraStop() {
     UMD_LOG_ERROR ("Camera WaitUntilIdle failed!\n");
   }
 
+  mVideoBufferQueue.abort();
+
   mVideoBufferThread->join();
   mVideoBufferThread = nullptr;
 
@@ -1467,6 +1469,7 @@ bool UmdCamera::CameraStop() {
   mStreamId = -1;
 
   if (mCodecVideoBufferThread) {
+    mCodecVideoBufferQueue.abort();
     mCodecVideoBufferThread->join();
     mCodecVideoBufferThread = nullptr;
   }
@@ -1478,6 +1481,9 @@ bool UmdCamera::CameraStop() {
     mC2Module = nullptr;
   }
 #endif
+
+  mVideoBufferQueue.reset();
+  mCodecVideoBufferQueue.reset();
   return true;
 }
 
