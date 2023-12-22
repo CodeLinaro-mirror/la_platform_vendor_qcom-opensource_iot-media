@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -12,6 +12,7 @@ void init_uvc();
 int32_t start_uvc();
 void stop_uvc();
 void deinit_uvc();
+int32_t get_gadget_cnt();
 
 int32_t init_uac(AudioCallback cb);
 void deinit_uac();
