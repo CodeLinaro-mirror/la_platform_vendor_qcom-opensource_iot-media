@@ -1646,7 +1646,7 @@ void UmdCamera::FillInitialControlValue() {
 #ifdef ENABLE_H264
 bool UmdCamera::InitializeCodec() {
   // Initialize codec2 component
-  mC2Module = C2Factory::GetModule(C2_COMPONENT_NAME);
+  mC2Module = C2Factory::GetModule(C2_COMPONENT_NAME, kVideoEncode);
   if (nullptr == mC2Module) {
     UMD_LOG_ERROR ("Failed to create c2module\n");
     return false;
