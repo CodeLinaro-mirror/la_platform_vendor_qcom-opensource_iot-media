@@ -27,6 +27,12 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
 #include <mutex>
@@ -37,10 +43,12 @@ template <typename T>
 class MessageQ {
 public:
   MessageQ()
-      : mTimeout(0) {}
+      : mTimeout(0),
+        mAbortFlag(false) {}
 
   MessageQ(int32_t timeout)
-      : mTimeout (timeout) {}
+      : mTimeout (timeout),
+        mAbortFlag(false) {}
 
   void push(T obj) {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -55,7 +63,8 @@ public:
       auto timeout = now + std::chrono::milliseconds(mTimeout);
       mCondition.wait_until(lock, timeout,
           [this, timeout] {
-            return (mQueue.size() > 0) || (timeout <= std::chrono::system_clock::now());
+            return (mQueue.size() > 0) ||
+                (timeout <= std::chrono::system_clock::now()) || mAbortFlag;
           });
       if (mQueue.size() == 0) {
         return -1;
@@ -63,8 +72,11 @@ public:
     } else {
       mCondition.wait(lock,
           [this] {
-            return mQueue.size() > 0;
+            return (mQueue.size() > 0) || mAbortFlag;
           });
+      if (mQueue.size() == 0) {
+        return -1;
+      }
     }
     obj = mQueue.front();
     mQueue.pop();
@@ -76,9 +88,21 @@ public:
     return mQueue.size();
   }
 
+  void abort() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mAbortFlag = true;
+    mCondition.notify_all();
+  }
+
+  void reset() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mAbortFlag = false;
+  }
+
 private:
   std::queue<T> mQueue;
   std::condition_variable mCondition;
   std::mutex mMutex;
   int32_t mTimeout;
+  std::atomic<bool> mAbortFlag;
 };
