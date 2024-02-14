@@ -210,7 +210,7 @@ int32_t get_gadget_cnt() {
   }
   std::getline(file, usb_mode);
   file.close();
-  std::regex pattern("\\d+");
+  std::regex pattern("(\\d+)(?=xuvc)");
 
   if (std::regex_search(usb_mode, match, pattern))
     count = std::stoi(match.str());
