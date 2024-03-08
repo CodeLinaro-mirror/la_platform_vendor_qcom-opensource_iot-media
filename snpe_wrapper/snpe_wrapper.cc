@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -147,10 +147,10 @@ int32_t SNPEContext::CreateUserBuffer(BufferType type,
     if (elem_size == sizeof(uint8_t))
     {
       userBufferEncoding = std::unique_ptr<zdl::DlSystem::UserBufferEncodingTf8>(
-          new zdl::DlSystem::UserBufferEncodingTf8(0, 1.0));
+          new zdl::DlSystem::UserBufferEncodingTf8(0, 1.0, 8));
     } else {
-      userBufferEncoding = std::unique_ptr<zdl::DlSystem::UserBufferEncodingFloat>(
-          new zdl::DlSystem::UserBufferEncodingFloat());
+      userBufferEncoding = std::unique_ptr<zdl::DlSystem::UserBufferEncodingFloatN>(
+          new zdl::DlSystem::UserBufferEncodingFloatN());
     }
     m_encoding = userBufferEncoding.get();
   } else {
@@ -268,19 +268,24 @@ std::unique_ptr<zdl::SNPE::SNPE> SNPEContext::SetBuilderOptions() {
   std::unique_ptr <zdl::SNPE::SNPE> snpe;
   zdl::SNPE::SNPEBuilder snpeBuilder(snpe_params_.container.get());
   zdl::DlSystem::StringList output_layers;
+  zdl::DlSystem::RuntimeList rtlist;
 
   for (size_t i = 0; i < output_layers_.size(); i++) {
     output_layers.append(output_layers_[i].c_str());
   }
 
+  if(rtlist.empty()) {
+    rtlist.add(runtime_);
+  }
+
   if (io_type_ == NetworkIO::kUserBuffer) {
     snpe =
-        snpeBuilder.setOutputLayers(output_layers).setRuntimeProcessor(runtime_)
-            .setUseUserSuppliedBuffers(true).setCPUFallbackMode(true).build();
+        snpeBuilder.setOutputLayers(output_layers).setRuntimeProcessorOrder(rtlist)
+            .setUseUserSuppliedBuffers(true).build();
   } else if (io_type_ == NetworkIO::kITensor) {
     snpe =
-        snpeBuilder.setOutputLayers(output_layers).setRuntimeProcessor(runtime_)
-            .setUseUserSuppliedBuffers(false).setCPUFallbackMode(true).build();
+        snpeBuilder.setOutputLayers(output_layers).setRuntimeProcessorOrder(rtlist)
+            .setUseUserSuppliedBuffers(false).build();
   } else {
     ALOGE("%s: Invalid Network IO value", __func__);
     throw std::runtime_error("Invalid Network IO value");
@@ -349,9 +354,9 @@ int32_t SNPEContext::PopulateMap(BufferType type) {
 }
 
 int32_t SNPEContext::InitFramework() {
-  ALOGI("%s Enter", __func__);
-  version_ = zdl::SNPE::SNPEFactory::getLibraryVersion();
-  ALOGI("SNPE version: %s", version_.toString().c_str());
+  ALOGI("%s :Enter", __func__);
+  zdl::DlSystem::Version_t version = zdl::SNPE::SNPEFactory::getLibraryVersion();
+  ALOGI("SNPE version: %s", version.asString().c_str());
 
   snpe_params_.snpe = SetBuilderOptions();
   if (nullptr == snpe_params_.snpe) {
