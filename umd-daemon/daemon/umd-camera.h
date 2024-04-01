@@ -63,8 +63,8 @@
  */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -84,6 +84,8 @@
 #ifdef ENABLE_H264
 #include "c2-module.h"
 #endif
+
+#include "umd-video-data-processing.h"
 
 using namespace ::android;
 using namespace ::camera::adaptor;
@@ -205,8 +207,6 @@ private:
   int32_t InitializeAudio();
 
   void cameraThreadHandler();
-  void videoBufferLoop();
-  void codecVideoBufferLoop();
 
   int32_t InitializeCamera();
   bool CameraStart();
@@ -220,21 +220,12 @@ private:
   void SetDefaultControlValues(CameraMetadata& meta);
   void FillInitialControlValue();
 
-  uint32_t GetBlobSize(uint8_t *buffer, uint32_t size);
+  uint32_t GetGadgetCount();
 
-  void SetEncoderParameters();
-  bool InitializeCodec();
-  void OnFrameAvailable(uint8_t* data, uint32_t size, uint64_t timestamp);
-  void PrintFPS();
-#ifdef ENABLE_H264
-  void SetParams (std::unique_ptr<C2Param> c2param, std::string type);
-  std::shared_ptr<C2Buffer> ImportGraphicBuffer(StreamBuffer buffer);
-
-  C2Module *mC2Module;
-#endif
   UmdGadget *mGadget;
   UmdVideoSetup mVsetup;
   UmdVideoCallbacks mUmdVideoCallbacks;
+  UmdVideoData *mVdata;
   std::mutex mGadgetMutex;
   std::string mUvcDev;
   std::string mUacDev;
@@ -250,7 +241,6 @@ private:
   bool mOnlyUAC;
 
   std::shared_ptr<Camera3DeviceClient> mDeviceClient;
-  IAllocDevice* mAllocDeviceInterface;
   CameraMetadata mStaticInfo;
   CameraClientCallbacks mClientCb;
   Camera3Request mRequest;
@@ -260,45 +250,16 @@ private:
 
   std::mutex mCameraMutex;
 
-  MessageQ<std::pair<StreamBuffer, int32_t>> mVideoBufferQueue;
-  MessageQ<std::pair<StreamBuffer, int32_t>> mCodecVideoBufferQueue;
-  std::unique_ptr<std::thread> mVideoBufferThread;
-  std::unique_ptr<std::thread> mCodecVideoBufferThread;
-
   UVCControlValues mCtrlValues;
   StreamRotation mRotation;
 
-  struct timespec mTv;
-  struct timespec mPrevtv;
-  int64_t mCount;
-};
-
-class UmdBufferMap {
-private:
-  std::map<int32_t, StreamBuffer> bufferMap;
-  std::mutex mapMutex;
-
-public:
-  void insert(uint64_t key, StreamBuffer buffer) {
-    std::lock_guard<std::mutex> guard(mapMutex);
-    bufferMap[key] = buffer;
-  }
-
-  void erase(uint64_t key) {
-    std::lock_guard<std::mutex> guard(mapMutex);
-    auto it = bufferMap.find(key);
-    if (it != bufferMap.end()) {
-      bufferMap.erase(it);
-    }
-  }
-
-  StreamBuffer& find(int key) {
-    StreamBuffer buffer;
-    std::lock_guard<std::mutex> guard(mapMutex);
-    auto it = bufferMap.find(key);
-    if (it != bufferMap.end()) {
-      return it->second;
-    }
-    return buffer;
-  }
+  int32_t mStreamIdx;
+  static uint32_t mGadgetItr;
+  static bool mCamStartDone;
+  static bool mCamStopDone;
+  std::vector<int> mCameraStreams;
+  std::vector<UmdGadget *> mGadgets;
+  std::vector<C2Module *> mC2Modules;
+  uint32_t mGadgetCount;
+  std::unordered_map<int, std::pair<UmdGadget *, UmdVideoData *>> mStreamMap;
 };
