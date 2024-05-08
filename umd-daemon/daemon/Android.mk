@@ -15,6 +15,7 @@ LOCAL_CFLAGS += -DTARGET_LAHAINA
 endif
 
 LOCAL_SRC_FILES := umd-camera.cpp \
+                   umd-fake-camera.cpp \
                    audio-stream.cpp \
                    audio-pcm.cpp \
                    umd.cpp \
