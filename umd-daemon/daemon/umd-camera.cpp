@@ -29,8 +29,8 @@
 
 
 /*
-# Changes from Qualcomm Innovation Center are provided under the following license :
-# Copyright(c) 2022-2023 Qualcomm Innovation Center, Inc.
+# Changes from Qualcomm Innovation Center, Inc. are provided under the following license :
+# Copyright(c) 2022-2024 Qualcomm Innovation Center, Inc.
 #
 # Redistributionand use in sourceand binary forms, with or without
 # modification, are permitted(subject to the limitations in the
@@ -1357,6 +1357,8 @@ bool UmdCamera::CameraStart() {
   const std::lock_guard<std::mutex> lock(mCameraMutex);
 
   CameraStreamParameters params = {};
+  StreamConfiguration config = {};
+  config.params = &params;
 
   mVideoBufferThread = std::unique_ptr<std::thread>(
       new std::thread(&UmdCamera::videoBufferLoop, this));
@@ -1407,6 +1409,10 @@ bool UmdCamera::CameraStart() {
                             IMemAllocUsage::kHwCameraWrite;
   params.cb = [&](StreamBuffer buffer) { StreamCb(buffer); };
 
+  auto hdr = Property::Get("persist.vendor.umd.uvc.hdr", 1);
+  if (hdr)
+    params.cam_feature_flags |=  static_cast<uint32_t>(CamFeatureFlag::kHDR);
+
   mStreamId = mDeviceClient->CreateStream(params);
   if (mStreamId < 0) {
     UMD_LOG_ERROR("Camera CreateStream failed!\n");
@@ -1415,7 +1421,7 @@ bool UmdCamera::CameraStart() {
 
   mRequest.streamIds.add(mStreamId);
 
-  ret = mDeviceClient->EndConfigure();
+  ret = mDeviceClient->EndConfigure(config);
   if (0 != ret) {
     UMD_LOG_ERROR ("Camera EndConfigure failed!\n");
     return false;

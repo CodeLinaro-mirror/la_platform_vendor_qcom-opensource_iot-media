@@ -19,6 +19,12 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #define LOG_TAG "CameraAdaptor"
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,14 +39,12 @@
 
 #include "camera_hidl_vendor_tag_descriptor.h"
 
-#ifdef DISABLE_OP_MODES
 #define QCAMERA3_SENSORMODE_ZZHDR_OPMODE      (0xF002)
 #define QCAMERA3_SENSORMODE_FPS_DEFAULT_INDEX (0x0)
 #define FORCE_SENSORMODE_ENABLE               (1 << 24)
 #define EIS_ENABLE                            (0xF200)
 #define LDC_ENABLE                            (0xF800)
 #define LCAC_ENABLE                           (0x100000)
-#endif
 
 // Convenience macros for transitioning to the error state
 #define SET_ERR(fmt, ...) \
@@ -2124,26 +2128,13 @@ Return<void> Camera3DeviceClient::notify(const hidl_vec<NotifyMsg>& messages) {
 StreamConfigurationMode Camera3DeviceClient::GetOpMode() {
   CAMERA_DEBUG("%s: Enter: \n", __func__);
 
-  StreamConfigurationMode operation_mode;
-
-#ifndef DISABLE_OP_MODES
-  if (is_raw_only_) {
-    // QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE;
-    operation_mode = StreamConfigurationMode::VENDOR_MODE_0;
-  } else {
-    operation_mode = StreamConfigurationMode::NORMAL_MODE;
-  }
-#else
-  operation_mode = CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE;
+  uint32_t operation_mode = 0x00;
 
   // Handle ZZHDR Mode
   if (cam_feature_flags_ & static_cast<uint32_t>(CamFeatureFlag::kHDR)) {
     operation_mode |= QCAMERA3_SENSORMODE_ZZHDR_OPMODE;
   }
-  // Handle HFR Mode
-  if (hfr_mode_enabled_) {
-    operation_mode |= CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE;
-  }
+
   // Handle EIS mode
   if (cam_feature_flags_ & static_cast<uint32_t>(CamFeatureFlag::kEIS)) {
     operation_mode |= EIS_ENABLE;
@@ -2156,28 +2147,10 @@ StreamConfigurationMode Camera3DeviceClient::GetOpMode() {
   if (cam_feature_flags_ & static_cast<uint32_t>(CamFeatureFlag::kLCAC)) {
     operation_mode |= LCAC_ENABLE;
   }
-  /*
-   * Below two features are mutually exclusive:
-   * 1. Using force sensor mode
-   * 2. Default 60 fps usecase, in which OpMode is index of 60fps
-   *    in sensor mode table
-   */
-  if (cam_feature_flags_ &
-      static_cast<uint32_t>(CamFeatureFlag::kForceSensorMode)) {
-    operation_mode |= ((FORCE_SENSOR_MODE_MASK & cam_feature_flags_)
-        | FORCE_SENSORMODE_ENABLE);
-    CAMERA_INFO("%s: Force_sensor_mode OpMode is set to 0x%x \n", __func__,
-              operation_mode);
-
-  } else if (fps_sensormode_index_ > QCAMERA3_SENSORMODE_FPS_DEFAULT_INDEX) {
-    operation_mode |= (fps_sensormode_index_ << 16);
-    CAMERA_INFO("%s: 60+ FPS OpMode is Set 0x%x \n", __func__, operation_mode);
-  }
-#endif
 
   CAMERA_DEBUG("%s: Exit: \n", __func__);
 
-  return operation_mode;
+  return static_cast<StreamConfigurationMode>(operation_mode);
 }
 
 }  // namespace adaptor ends here
