@@ -1409,7 +1409,7 @@ bool UmdCamera::CameraStart() {
                             IMemAllocUsage::kHwCameraWrite;
   params.cb = [&](StreamBuffer buffer) { StreamCb(buffer); };
 
-  auto hdr = Property::Get("persist.vendor.umd.uvc.hdr", 1);
+  auto hdr = Property::Get("persist.vendor.umd.uvc.hdr", 0);
   if (hdr)
     params.cam_feature_flags |=  static_cast<uint32_t>(CamFeatureFlag::kHDR);
 
