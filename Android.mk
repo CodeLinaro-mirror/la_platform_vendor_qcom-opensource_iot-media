@@ -1,4 +1,4 @@
-ifeq ($(call is-board-platform-in-list,kona lahaina),true)
+ifeq ($(call is-board-platform-in-list,kona lahaina kalama),true)
 
 IOT_MEDIA_PATH:= $(call my-dir)
 

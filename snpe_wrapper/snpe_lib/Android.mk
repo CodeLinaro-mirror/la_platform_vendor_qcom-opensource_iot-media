@@ -11,6 +11,7 @@ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
 LOCAL_MULTILIB := both
 LOCAL_SRC_FILES_arm64 := $(SNPE_SDK)/lib/aarch64-android-clang6.0/libSNPE.so
 LOCAL_SRC_FILES_arm := $(SNPE_SDK)/lib/arm-android-clang6.0/libSNPE.so
+LOCAL_CHECK_ELF_FILES := false
 include $(BUILD_PREBUILT)
 
 endif
