@@ -1,4 +1,10 @@
 /*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -107,8 +113,7 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
   HidlAllocBuffer *buffer = new HidlAllocBuffer;
   handle = buffer;
 
-  hidl_vec<uint32_t> descriptor;
-  mapper::V3_0::IMapper::BufferDescriptorInfo descriptor_info {};
+  IMapper::BufferDescriptorInfo descriptor_info {};
 
   descriptor_info.width = width;
   descriptor_info.height = height;
@@ -118,10 +123,17 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
 
   descriptor_info.usage = static_cast<uint64_t>(local_usage);
 
-  Return<void> ret = hidl_mapper_->createDescriptor(descriptor_info,
-      [&descriptor](auto err, auto desc) {
-        descriptor = desc;
-      });
+#ifdef ALLOCATOR_IMAPPER_V4
+  hidl_vec<uint8_t> descriptor;
+  Return<void> ret = hidl_mapper_->createDescriptor(
+    descriptor_info,
+    [&descriptor](const auto &err,const auto &desc) { descriptor = desc; });
+#else
+  hidl_vec<uint32_t> descriptor;
+  Return<void> ret = hidl_mapper_->createDescriptor(
+    descriptor_info,
+    [&descriptor](auto err, auto desc) { descriptor = desc; });
+#endif
 
   if (!ret.isOk()) {
     CAMERA_ERROR("%s: Create descriptor failed.\n", __func__);
@@ -137,7 +149,7 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
           ret = hidl_mapper_->importBuffer(buffers[0], [&](const auto &err,
                                            const auto &buffer) {
               buffer_handle = static_cast<buffer_handle_t>(buffer);
-              if (mapper::V3_0::Error::NONE != err) {
+              if (Error::NONE != err) {
                 CAMERA_ERROR("Mapper failed to import buffer\n");
               }
           });
@@ -195,17 +207,28 @@ MemAllocError HidlAllocDevice::MapBuffer(const IBufferHandle& handle,
   auto buffer = const_cast<native_handle_t*>(b->GetNativeHandle());
 
   hidl_handle fence_handle;
-  mapper::V3_0::IMapper::Rect region {start_x, start_y, width, height};
+  IMapper::Rect region {start_x, start_y, width, height};
 
   void* data = nullptr;
+#ifdef ALLOCATOR_IMAPPER_V4
   hidl_mapper_->lock(buffer, local_usage, region, fence_handle,
-      [&](const auto& error, const auto& data, int32_t bpp, int32_t bps) {
+      [&](const auto& error, const auto& data) {
           *vaddr = data;
-          if (mapper::V3_0::Error::NONE  != error) {
+          if (Error::NONE  != error) {
             ret = MemAllocError::kAllocFail;
             *vaddr = nullptr;
           }
       });
+#else
+  hidl_mapper_->lock(buffer, local_usage, region, fence_handle,
+      [&](const auto& error, const auto& data, int32_t bpp, int32_t bps) {
+          *vaddr = data;
+          if (Error::NONE  != error) {
+            ret = MemAllocError::kAllocFail;
+            *vaddr = nullptr;
+          }
+      });
+#endif
 
   return ret;
 }
@@ -218,7 +241,7 @@ MemAllocError HidlAllocDevice::UnmapBuffer(const IBufferHandle& handle) {
   auto buffer = const_cast<native_handle_t*>(b->GetNativeHandle());
 
   hidl_mapper_->unlock(buffer, [&](const auto& error, const auto& release_fence) {
-    if (mapper::V3_0::Error::NONE != error) {
+    if (Error::NONE != error) {
       CAMERA_ERROR("%s: failed to unlock buffer", __func__);
       ret = MemAllocError::kAllocFail;
     }
@@ -253,13 +276,13 @@ MemAllocError HidlAllocDevice::Perform(const IBufferHandle& handle,
   }
 }
 
-android::sp<allocator::V3_0::IAllocator> HidlAllocDevice::GetDevice() const {
+android::sp<IAllocator> HidlAllocDevice::GetDevice() const {
   return hidl_alloc_device_;
 }
 
 HidlAllocDevice::HidlAllocDevice() {
-  hidl_alloc_device_ = allocator::V3_0::IAllocator::getService();
-  hidl_mapper_ = mapper::V3_0::IMapper::getService();
+  hidl_alloc_device_ = IAllocator::getService();
+  hidl_mapper_ = IMapper::getService();
 
   assert(nullptr != hidl_alloc_device_.get());
   assert(nullptr != hidl_mapper_.get());

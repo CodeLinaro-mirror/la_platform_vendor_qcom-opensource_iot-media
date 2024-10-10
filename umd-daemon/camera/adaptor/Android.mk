@@ -43,9 +43,16 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.camera.device@3.2 \
     android.hardware.camera.metadata@3.4 \
     android.hardware.camera.common@1.0 \
-    android.hardware.graphics.common@1.0 \
-    android.hardware.graphics.allocator@3.0 \
-    android.hardware.graphics.mapper@3.0
+    android.hardware.graphics.common@1.0
+
+ifeq ($(call is-board-platform-in-list, kalama),true)
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@4.0
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@4.0
+LOCAL_CPPFLAGS += -DALLOCATOR_IMAPPER_V4
+else
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@3.0
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@3.0
+endif
 
 LOCAL_STATIC_LIBRARIES := \
     android.hardware.camera.common@1.0-helper

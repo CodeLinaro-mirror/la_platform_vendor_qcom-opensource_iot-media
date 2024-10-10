@@ -1,4 +1,10 @@
 /*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,9 +42,20 @@
 
 #include <android/hardware/camera/provider/2.4/ICameraProvider.h>
 
+#ifdef ALLOCATOR_IMAPPER_V4
+#include <android/hardware/graphics/allocator/4.0/IAllocator.h>
+#include <android/hardware/graphics/mapper/4.0/IMapper.h>
+#include <android/hardware/graphics/mapper/4.0/types.h>
+using namespace ::android::hardware::graphics::allocator::V4_0;
+using namespace ::android::hardware::graphics::mapper::V4_0;
+#else
 #include <android/hardware/graphics/allocator/3.0/IAllocator.h>
 #include <android/hardware/graphics/mapper/3.0/IMapper.h>
 #include <android/hardware/graphics/mapper/3.0/types.h>
+using namespace ::android::hardware::graphics::allocator::V3_0;
+using namespace ::android::hardware::graphics::mapper::V3_0;
+#endif
+
 #include <CameraMetadata.h>
 
 using ::android::hardware::camera::common::V1_0::helper::CameraMetadata;
@@ -51,9 +68,6 @@ using ::android::hardware::hidl_string;
 
 using ::android::hardware::Void;
 using ::android::hardware::Return;
-
-using namespace ::android::hardware::graphics::allocator::V3_0;
-using namespace ::android::hardware::graphics::mapper::V3_0;
 
 using ::android::hardware::graphics::common::V1_0::PixelFormat;
 
