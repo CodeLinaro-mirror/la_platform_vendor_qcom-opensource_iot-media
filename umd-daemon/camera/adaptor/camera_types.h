@@ -19,6 +19,12 @@
  * limitations under the License.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #ifndef CAMERA3TYPES_H_
 #define CAMERA3TYPES_H_
 #include <functional>
@@ -53,7 +59,7 @@ struct CameraStreamParameters {
   uint32_t width;
   uint32_t height;
   PixelFormat format;
-  DataspaceFlags data_space;
+  Dataspace data_space;
   StreamRotation rotation;
   MemAllocFlags allocFlags;
   uint32_t bufferCount;
@@ -61,7 +67,7 @@ struct CameraStreamParameters {
   uint32_t cam_feature_flags;
   CameraStreamParameters() :
         width(0), height(0),
-        data_space(static_cast<DataspaceFlags>
+        data_space(static_cast<Dataspace>
           (::android::hardware::graphics::common::V1_0::Dataspace::UNKNOWN)),
         rotation(StreamRotation::ROTATION_0),
         allocFlags(), bufferCount(0), cb(nullptr),
@@ -83,7 +89,7 @@ struct StreamConfiguration {
 
 typedef struct Camera3Request_t {
   CameraMetadata metadata;
-  Vector<int32_t> streamIds;
+  std::vector<int32_t> streamIds;
 } Camera3Request;
 
 typedef struct {

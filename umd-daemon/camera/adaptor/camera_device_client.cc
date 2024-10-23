@@ -31,13 +31,13 @@
 #include <errno.h>
 #include <dlfcn.h>
 #include <string.h>
-#include <utils/String8.h>
-
 #include "utils/camera_log.h"
 #include "camera_utils.h"
 #include "camera_device_client.h"
-
+#include <aidl/android/hardware/camera/provider/ICameraProvider.h>
 #include "camera_hidl_vendor_tag_descriptor.h"
+#include <android/binder_manager.h>
+#include <android/binder_process.h>
 
 #define QCAMERA3_SENSORMODE_ZZHDR_OPMODE      (0xF002)
 #define QCAMERA3_SENSORMODE_FPS_DEFAULT_INDEX (0x0)
@@ -52,6 +52,8 @@
 #define SET_ERR_L(fmt, ...) \
   SetErrorStateLocked("%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 using namespace qcamera;
+
+using ::aidl::android::hardware::camera::provider::ICameraProvider;
 
 uint32_t camera_log_level;
 
@@ -114,7 +116,7 @@ Camera3DeviceClient::~Camera3DeviceClient() {
   }
   streams_.clear();
 
-  Vector<Camera3Stream* >::iterator it = deleted_streams_.begin();
+  std::vector<Camera3Stream* >::iterator it = deleted_streams_.begin();
   while (it != deleted_streams_.end()) {
     Camera3Stream *stream = *it;
     it = deleted_streams_.erase(it);
@@ -143,7 +145,6 @@ Camera3DeviceClient::~Camera3DeviceClient() {
 
 int32_t Camera3DeviceClient::Initialize() {
   int32_t res = 0;
-  Return<void> ret;
 
   pthread_mutex_lock(&lock_);
 
@@ -153,23 +154,30 @@ int32_t Camera3DeviceClient::Initialize() {
     goto exit;
   }
 
-  camera_provider_ = ICameraProvider::getService("legacy/0");
+  {
+    bool success = ABinderProcess_setThreadPoolMaxThreadCount(5);
+    CAMERA_DEBUG("ABinderProcess_setThreadPoolMaxThreadCount returns %s", success ? "true" : "false");
+
+    ABinderProcess_startThreadPool();
+
+    std::string serviceDescriptor = std::string() + ICameraProvider::descriptor + "/vendor_qti/0";
+    ndk::SpAIBinder cameraProviderBinder = SpAIBinder(AServiceManager_getService(serviceDescriptor.c_str()));
+    if(cameraProviderBinder.get() == nullptr){
+      CAMERA_ERROR("%s: Failed to get camera provider service \n",__func__);
+    }
+    camera_provider_ = ICameraProvider::fromBinder(cameraProviderBinder);
+  }
+
   if (camera_provider_ == nullptr) {
     CAMERA_ERROR("%s: Invalid camera provider \n", __func__);
     res = -ENOSYS;
     goto exit;
   }
 
-  ret = camera_provider_->getCameraIdList(
-    [&](auto status, const auto& idList) {
-        CAMERA_INFO("getCameraIdList returns status:%d\n", (int)status);
-        for (size_t i = 0; i < idList.size(); i++) {
-          CAMERA_INFO("Camera Id[%zu] is %s\n", i, idList[i].c_str());
-        }
-        for (const auto& id : idList) {
-          camera_device_names_.push_back(id);
-        }
-    });
+  ret_ = camera_provider_->getCameraIdList(&camera_device_names_);
+  if (!ret_.isOk()) {
+    CAMERA_ERROR("%s: Could not get camera id list \n");
+  }
 
   number_of_cameras_ = camera_device_names_.size();
   CAMERA_INFO("%s: Number of cameras: %d\n", __func__, number_of_cameras_);
@@ -177,18 +185,10 @@ int32_t Camera3DeviceClient::Initialize() {
   {
     std::lock_guard<std::mutex> lk(vendor_tag_mutex_);
     if (client_count_ == 0) {
-      hardware::hidl_vec<VendorTagSection> vt_sections;
-      ::android::hardware::camera::common::V1_0::Status status;
-      ret = camera_provider_->getVendorTags(
-          [&](auto s, const auto& vendorTagSecs) {
-            status = s;
-            if (s == ::android::hardware::camera::common::V1_0::Status::OK) {
-                vt_sections = vendorTagSecs;
-            }
-      });
-
-      if (!ret.isOk()) {
-        CAMERA_ERROR("%s: Error getting vendor tags from provider\n");
+      std::vector<VendorTagSection> vt_sections;
+      ret_ = camera_provider_->getVendorTags(&vt_sections);
+      if (!ret_.isOk()) {
+        CAMERA_ERROR("%s: Error getting vendor tags from provider \n",__func__);
         goto exit;
       }
 
@@ -248,11 +248,10 @@ exit:
 }
 
 int32_t Camera3DeviceClient::OpenCamera(uint32_t idx) {
-  Return<void> ret;
-  ::android::hardware::camera::common::V1_0::Status status;
+
   int32_t res = 0;
-  std::string name;
   std::string id;
+  std::string name;
   camera_metadata_entry_t capsEntry;
   MarkRequest mark_cb = [&] (uint32_t frameNumber, int32_t numBuffers,
                                  CaptureResultExtras resultExtras) {
@@ -283,62 +282,42 @@ int32_t Camera3DeviceClient::OpenCamera(uint32_t idx) {
     goto exit;
   }
 
-  ret = camera_provider_->getCameraDeviceInterface_V3_x(
-    camera_device_names_[idx], [&](auto s, const auto& device3_x) {
-      CAMERA_INFO("getCameraDeviceInterface_V3_x returns status: %d", (int)s);
-      if (s == ::android::hardware::camera::common::V1_0::Status::OK) {
-        camera_device_ = ICameraDevice::castFrom(device3_x);
-      }
-    });
+  ret_ = camera_provider_->getCameraDeviceInterface(camera_device_names_[idx], &camera_device_);
 
-  if (!ret.isOk() || !camera_device_) {
-    CAMERA_ERROR("Invalid device interface.  \n");
-    goto exit;
+  CAMERA_INFO("getCameraDeviceInterface returns status:%d:%d", ret_.getExceptionCode(),
+          ret_.getServiceSpecificError());
+
+  cameraClientCallback_.reset(this);
+  ret_ = camera_device_->open(cameraClientCallback_ , &camera_session_);
+  if (!ret_.isOk()) {
+    CAMERA_ERROR("%s : Open Camera failed",__func__);
   }
 
-  ret = camera_device_->open(
-    this,
-    [&](auto s, const auto& session) {
-        ALOGI("device::open returns status:%d", (int)s);
-        if (s == ::android::hardware::camera::common::V1_0::Status::OK) {
-          camera_session_ = ICameraDeviceSession::castFrom(session);
+  {
+    ::aidl::android::hardware::camera::device::CameraMetadata cameraCharacteristics;
+    ret_ = camera_device_->getCameraCharacteristics(&cameraCharacteristics);
+    if (!ret_.isOk()) {
+      CAMERA_INFO("%s :Failed to get camera characteristics for device",__func__);
+    }
+    auto camera_metadata = reinterpret_cast<camera_metadata_t*>(cameraCharacteristics.metadata.data());
+    device_info_.clear();
+    device_info_.append(camera_metadata);
+  }
+
+  {
+    ::aidl::android::hardware::common::fmq::MQDescriptor<
+                  int8_t, aidl::android::hardware::common::fmq::SynchronizedReadWrite>
+                  descriptor;
+    ndk::ScopedAStatus resultQueueRet = camera_session_->getCaptureResultMetadataQueue(&descriptor);
+    if (!resultQueueRet.isOk()) {
+      CAMERA_INFO("Failed to get Capture Result Metadata Queue for device");
+    }
+
+    result_metadata_queue_ = std::make_shared<ResultMetadataQueue>(descriptor);
+    if (!result_metadata_queue_->isValid() || result_metadata_queue_->availableToWrite() <= 0) {
+          CAMERA_ERROR("%s: getCaptureResultMetadataQueue failed", __func__);
+          result_metadata_queue_ = nullptr;
         }
-    });
-
-  if (!ret.isOk() || !camera_session_) {
-    CAMERA_ERROR("Could not open camera: %s \n", idx);
-    goto exit;
-  }
-
-  ret = camera_device_->getCameraCharacteristics(
-      [&] (auto s, auto metadata) {
-        auto camera_metadata =
-          reinterpret_cast<const camera_metadata_t*>(metadata.data());
-        device_info_.clear();
-        device_info_.append(camera_metadata);
-        status = s;
-      });
-
-  if (!ret.isOk() || status != ::android::hardware::camera::common::V1_0::Status::OK) {
-    CAMERA_ERROR("%s: Error during getCameraCharacteristics: %s!\n", __func__,
-               (int)status);
-    goto exit;
-  }
-
-  ret = camera_session_->getCaptureResultMetadataQueue(
-      [&](const auto& descriptor) {
-          result_metadata_queue_ = std::make_unique<ResultMetadataQueue>(descriptor);
-          if (result_metadata_queue_ == nullptr ||
-              !result_metadata_queue_->isValid() ||
-              result_metadata_queue_->availableToWrite() <= 0) {
-              CAMERA_ERROR("%s: getCaptureResultMetadataQueue failed", __func__);
-              result_metadata_queue_ = nullptr;
-          }
-      });
-
-  if (!ret.isOk()) {
-    CAMERA_ERROR("%s: Error during getCameraCharacteristics: %s!\n", __func__);
-    goto exit;
   }
 
   {
@@ -439,7 +418,6 @@ int32_t Camera3DeviceClient::ConfigureStreams(const StreamConfiguration& stream_
 
 int32_t Camera3DeviceClient::ConfigureStreamsLocked() {
   status_t res = 0;
-
   if (state_ != STATE_NOT_CONFIGURED && state_ != STATE_CONFIGURED) {
     CAMERA_ERROR("%s: Not idle\n", __func__);
     return -ENOSYS;
@@ -450,7 +428,7 @@ int32_t Camera3DeviceClient::ConfigureStreamsLocked() {
     return 0;
   }
 
-  ::android::hardware::camera::device::V3_2::StreamConfiguration config{};
+  ::aidl::android::hardware::camera::device::StreamConfiguration config{};
 
   config.operationMode = GetOpMode();
 
@@ -485,19 +463,15 @@ int32_t Camera3DeviceClient::ConfigureStreamsLocked() {
   }
 #endif
   config.streams = streams;
+  std::vector<HalStream> halConfigs;
+  ret_ = camera_session_->configureStreams(config, &halConfigs);
 
-  HalStreamConfiguration hal_stream_config;
-  ::android::hardware::camera::common::V1_0::Status configure_status;
-  Return<void> ret = camera_session_->configureStreams(config,
-      [&] (auto s, HalStreamConfiguration hal_config) {
-          hal_stream_config = hal_config;
-          configure_status = s;
-      });
-
-  if (!ret.isOk() || configure_status != ::android::hardware::camera::common::V1_0::Status::OK) {
+  if (!ret_.isOk()) {
+    CAMERA_ERROR("Configure Stream returned error");
     for (uint32_t i = 0; i < streams_.size(); i++) {
       Camera3Stream *stream = streams_.editValueAt(i);
       if (stream->IsConfigureActive()) {
+        CAMERA_ERROR("Configure Stream returned error_1");
         res = stream->AbortConfigure();
         if (0 != res) {
           CAMERA_ERROR("Can't abort stream %d configure: %s (%d)\n",
@@ -536,7 +510,7 @@ int32_t Camera3DeviceClient::ConfigureStreamsLocked() {
   frame_number_ = 0;
   InternalUpdateStatusLocked(STATE_CONFIGURED);
 
-  Vector<Camera3Stream* >::iterator it = deleted_streams_.begin();
+  std::vector<Camera3Stream* >::iterator it = deleted_streams_.begin();
   while (it != deleted_streams_.end()) {
     Camera3Stream *stream = *it;
     it = deleted_streams_.erase(it);
@@ -907,19 +881,20 @@ int32_t Camera3DeviceClient::CreateDefaultRequest(int templateId,
     goto exit;
   }
 
-  camera_session_->constructDefaultRequestSettings((RequestTemplate) templateId,
-      [&](auto status, const auto& req) {
-          if (status == ::android::hardware::camera::common::V1_0::Status::OK) {
-            rawRequest = (camera_metadata_t*) req.data();
-          }
-      });
+  {
+    RequestTemplate t = (RequestTemplate) templateId;
+    ::aidl::android::hardware::camera::device::CameraMetadata req;
+    ret_ = camera_session_->constructDefaultRequestSettings(t, &req);
+    rawRequest = reinterpret_cast<const camera_metadata_t*>(req.metadata.data());
+  }
 
-  if (rawRequest == NULL) {
-    CAMERA_ERROR("%s: template %d is not supported on this camera device\n",
-               __func__, templateId);
+  if(!ret_.isOk()){
+    CAMERA_ERROR("%s: constructDefaultRequestSettings returns status:%d:%d",__func__,ret_.getExceptionCode(),
+                  ret_.getServiceSpecificError());
     res = -EINVAL;
     goto exit;
   }
+
   *request = rawRequest;
   request_templates_[templateId] = rawRequest;
 
@@ -940,7 +915,7 @@ int32_t Camera3DeviceClient::MarkPendingRequest(
   pthread_mutex_lock(&pending_requests_lock_);
 
   pending_requests_vector_.emplace(frameNumber,
-                                   PendingRequest(numBuffers, resultExtras));
+                                  PendingRequest(numBuffers, resultExtras));
 
   pthread_mutex_unlock(&pending_requests_lock_);
 
@@ -1019,7 +994,7 @@ bool Camera3DeviceClient::UpdatePartialTag(CameraMetadata &result, int32_t tag,
 
 int32_t Camera3DeviceClient::CancelRequest(int requestId,
                                            int64_t *lastFrameNumber) {
-  Vector<int32_t>::iterator it, end;
+  std::vector<int32_t>::iterator it, end;
   int32_t res = 0;
 
   pthread_mutex_lock(&lock_);
@@ -1071,16 +1046,18 @@ exit:
   return res;
 }
 void Camera3DeviceClient::HandleCaptureResult(
-    const ::android::hardware::camera::device::V3_2::CaptureResult &result) {
+    const ::aidl::android::hardware::camera::device::CaptureResult &result) {
   int32_t res;
-
+  ::aidl::android::hardware::camera::device::CameraMetadata resultMetadata;
   uint32_t frameNumber = result.frameNumber;
-  if (result.result.size() == 0 && result.outputBuffers.size() == 0) {
+  bool isPartialResult = false;
+
+  if (result.result.metadata.size() == 0 && result.outputBuffers.size() == 0) {
     //SET_ERR("No result data provided by HAL for frame %d", frameNumber);
     return;
   }
 
-  if (!is_partial_result_supported_ && result.result.size() > 0 &&
+  if (!is_partial_result_supported_ && sizeof(result.result) > 0 &&
       result.partialResult != 1) {
     SET_ERR(
         "Result is invalid for frame %d: partial_result %u should be 1"
@@ -1088,21 +1065,17 @@ void Camera3DeviceClient::HandleCaptureResult(
         frameNumber, result.partialResult);
     return;
   }
-
-  ::android::hardware::camera::device::V3_2::CameraMetadata resultMetadata;
-  if (result.fmqResultSize > 0) {
-      resultMetadata.resize(result.fmqResultSize);
-      if (nullptr == result_metadata_queue_) {
-          SET_ERR("%s: mResultMetadataQueue is nullptr", __func__);
-          return;
-      }
-      if (!result_metadata_queue_->read(resultMetadata.data(), result.fmqResultSize)) {
-          SET_ERR("%s: Read operation failed", __func__);
-          return;
-      }
-  }
-
-  bool isPartialResult = false;
+    if (result.fmqResultSize > 0) {
+        resultMetadata.metadata.resize(result.fmqResultSize);
+        if (nullptr == result_metadata_queue_) {
+            SET_ERR("%s: mResultMetadataQueue is nullptr", __func__);
+            return;
+        }
+        if (!result_metadata_queue_->read(reinterpret_cast<int8_t*>(resultMetadata.metadata.data()), result.fmqResultSize)) {
+            SET_ERR("%s: Read operation failed", __func__);
+            return;
+        }
+    }
   CameraMetadata collectedPartialResult;
   camera_metadata_ro_entry_t entry;
   uint32_t numBuffersReturned;
@@ -1125,14 +1098,13 @@ void Camera3DeviceClient::HandleCaptureResult(
   PendingRequest &request = pending_requests_vector_.at(frameNumber);
   CAMERA_DEBUG(
       "%s: Received PendingRequest requestId = %d, frameNumber = %d,"
-      "burstId = %d, partialResultCount = %d\n",
+      "burstId = %d, partialResultCount = %d\n request buffersRemaining = %d",
       __func__, request.resultExtras.requestId,
       request.resultExtras.frameNumber, request.resultExtras.burstId,
-      result.partialResult);
+      result.partialResult, request.buffersRemaining);
   if (result.partialResult != 0)
     request.resultExtras.partialResultCount = result.partialResult;
-
-  if (is_partial_result_supported_ && result.result.size() > 0) {
+  if (is_partial_result_supported_ && result.result.metadata.size() > 0) {
     if (result.partialResult > partial_result_count_ ||
         result.partialResult < 1) {
       SET_ERR(
@@ -1146,9 +1118,8 @@ void Camera3DeviceClient::HandleCaptureResult(
     if (isPartialResult) {
       request.partialResult.composedResult.clear();
       request.partialResult.composedResult.append(
-          (const camera_metadata_t *)result.result.data());
+          (const camera_metadata_t *)result.result.metadata.data());
     }
-
     if (isPartialResult) {
       request.partialResult.partial3AReceived = HandlePartialResult(
           frameNumber, request.partialResult.composedResult,
@@ -1158,7 +1129,7 @@ void Camera3DeviceClient::HandleCaptureResult(
 
   shutterTimestamp = request.shutterTS;
 
-  if (result.result.size() > 0 && !isPartialResult) {
+  if (result.result.metadata.size() > 0 && !isPartialResult) {
     if (request.isMetaPresent) {
       SET_ERR("Called several times with meta for frame %d", frameNumber);
       goto exit;
@@ -1172,7 +1143,7 @@ void Camera3DeviceClient::HandleCaptureResult(
 
   numBuffersReturned = result.outputBuffers.size();
   request.buffersRemaining -= numBuffersReturned;
-  if (NULL != result.inputBuffer.buffer) {
+  if (!result.inputBuffer.buffer.fds.empty()) {
     request.buffersRemaining--;
   }
   if (request.buffersRemaining < 0) {
@@ -1181,27 +1152,31 @@ void Camera3DeviceClient::HandleCaptureResult(
   }
 
   res = find_camera_metadata_ro_entry(
-      (const camera_metadata_t *) result.result.data(),
+      (const camera_metadata_t *) result.result.metadata.data(),
       ANDROID_SENSOR_TIMESTAMP, &entry);
 
   if ((0 == res) && (entry.count == 1)) {
     request.sensorTS = entry.data.i64[0];
   }
 
-  if ((shutterTimestamp == 0) && (result.outputBuffers.size() > 0)) {
-    for (auto &b : result.outputBuffers) {
-      request.pendingBuffers.add(b);
-    }
-  }
+  request.pendingBuffers.resize(result.outputBuffers.size());
 
-  if (result.result.size() > 0 && !isPartialResult) {
+ {
+   if ((shutterTimestamp == 0) && (result.outputBuffers.size() > 0)) {
+     std::vector<::aidl::android::hardware::camera::device::StreamBuffer>& outputBuffers =
+     const_cast<std::vector<::aidl::android::hardware::camera::device::StreamBuffer>&>(result.outputBuffers);
+     request.pendingBuffers = std::move(outputBuffers);
+   }
+ }
+
+  if (result.result.metadata.size() > 0 && !isPartialResult) {
     if (shutterTimestamp == 0) {
       request.pendingMetadata.clear();
       request.pendingMetadata.append(
-          (const camera_metadata_t *)resultMetadata.data());
+          (const camera_metadata_t *)resultMetadata.metadata.data());
       request.partialResult.composedResult = collectedPartialResult;
     } else {
-      CameraMetadata metadata((camera_metadata_t *) resultMetadata.data());
+      CameraMetadata metadata((camera_metadata_t *) resultMetadata.metadata.data());
       SendCaptureResult(metadata, request.resultExtras, collectedPartialResult,
                         frameNumber);
     }
@@ -1209,7 +1184,7 @@ void Camera3DeviceClient::HandleCaptureResult(
 
   if (0 < shutterTimestamp) {
     ReturnOutputBuffers(result.outputBuffers.data(), result.outputBuffers.size(),
-                        shutterTimestamp, result.frameNumber);
+                       shutterTimestamp, result.frameNumber);
   }
 
   RemovePendingRequestLocked(frameNumber);
@@ -1239,7 +1214,7 @@ exit:
   pthread_mutex_unlock(&pending_requests_lock_);
 }
 
-void Camera3DeviceClient::NotifyError(const ErrorMsg &msg) {
+ScopedAStatus Camera3DeviceClient::NotifyError(const ErrorMsg &msg) {
   std::map<ErrorCode,CameraErrorCode> error_map;
   error_map[static_cast<ErrorCode>(0)] = ERROR_CAMERA_INVALID_ERROR;
   error_map[ErrorCode::ERROR_DEVICE] = ERROR_CAMERA_DEVICE;
@@ -1248,7 +1223,7 @@ void Camera3DeviceClient::NotifyError(const ErrorMsg &msg) {
   error_map[ErrorCode::ERROR_BUFFER] = ERROR_CAMERA_BUFFER;
 
   CameraErrorCode errorCode =
-      (error_map.find( msg.errorCode ) != error_map.end())
+      (error_map.find(msg.errorCode) != error_map.end())
           ? error_map[msg.errorCode]
           : ERROR_CAMERA_INVALID_ERROR;
 
@@ -1285,10 +1260,10 @@ void Camera3DeviceClient::NotifyError(const ErrorMsg &msg) {
       SET_ERR("Unknown error message from HAL: %d", msg.errorCode);
       break;
   }
+  return ScopedAStatus::ok();
 }
 
-void Camera3DeviceClient::NotifyShutter(const ShutterMsg &msg) {
-
+ScopedAStatus Camera3DeviceClient::NotifyShutter(const ShutterMsg &msg) {
   pthread_mutex_lock(&pending_requests_lock_);
   bool pending_request_found = false;
   if (pending_requests_vector_.count(msg.frameNumber)) {
@@ -1306,7 +1281,7 @@ void Camera3DeviceClient::NotifyShutter(const ShutterMsg &msg) {
             "notification for frame %d, got frame %d",
             next_shutter_input_frame_number_, msg.frameNumber);
         pthread_mutex_unlock(&pending_requests_lock_);
-        return;
+        return ScopedAStatus::ok();
       }
       next_shutter_input_frame_number_ = msg.frameNumber + 1;
     } else {
@@ -1316,7 +1291,7 @@ void Camera3DeviceClient::NotifyShutter(const ShutterMsg &msg) {
             "notification for frame %d, got frame %d",
             next_shutter_frame_number_, msg.frameNumber);
         pthread_mutex_unlock(&pending_requests_lock_);
-        return;
+        return ScopedAStatus::ok();
       }
       next_shutter_frame_number_ = msg.frameNumber + 1;
     }
@@ -1325,7 +1300,7 @@ void Camera3DeviceClient::NotifyShutter(const ShutterMsg &msg) {
 
     SendCaptureResult(r.pendingMetadata, r.resultExtras,
                       r.partialResult.composedResult, msg.frameNumber);
-    ReturnOutputBuffers(r.pendingBuffers.array(), r.pendingBuffers.size(),
+    ReturnOutputBuffers(r.pendingBuffers.data(), r.pendingBuffers.size(),
                         r.shutterTS, msg.frameNumber);
     r.pendingBuffers.clear();
 
@@ -1337,6 +1312,7 @@ void Camera3DeviceClient::NotifyShutter(const ShutterMsg &msg) {
     SET_ERR("Shutter notification with invalid frame number %d",
             msg.frameNumber);
   }
+  return ScopedAStatus::ok();
 }
 
 void Camera3DeviceClient::SendCaptureResult(
@@ -1395,7 +1371,7 @@ void Camera3DeviceClient::SendCaptureResult(
 }
 
 void Camera3DeviceClient::ReturnOutputBuffers(
-    const ::android::hardware::camera::device::V3_2::StreamBuffer *outputBuffers, size_t numBuffers,
+    const ::aidl::android::hardware::camera::device::StreamBuffer *outputBuffers, size_t numBuffers,
     int64_t timestamp, int64_t frame_number) {
   for (size_t i = 0; i < numBuffers; i++) {
     Camera3Stream *stream = streams_.valueFor(outputBuffers[i].streamId);
@@ -1418,7 +1394,18 @@ void Camera3DeviceClient::ReturnOutputBuffers(
   }
 }
 
-int32_t Camera3DeviceClient::ReturnStreamBuffer(StreamBuffer buffer) {
+ScopedAStatus Camera3DeviceClient::requestStreamBuffers(
+    const std::vector<aidl::android::hardware::camera::device::BufferRequest>& bufReqs,
+    std::vector<aidl::android::hardware::camera::device::StreamBufferRet>* outBuffers,
+    aidl::android::hardware::camera::device::BufferRequestStatus* status){
+  return ScopedAStatus::ok();
+}
+
+ScopedAStatus Camera3DeviceClient::returnStreamBuffers(const std::vector<::aidl::android::hardware::camera::device::StreamBuffer>& in_buffers) {
+    return ndk::ScopedAStatus::ok();
+}
+
+ScopedAStatus Camera3DeviceClient::ReturnStreamBuffer(StreamBuffer buffer) {
   Camera3Stream *stream;
   int32_t streamIdx;
   int32_t res = 0;
@@ -1450,7 +1437,6 @@ int32_t Camera3DeviceClient::ReturnStreamBuffer(StreamBuffer buffer) {
     res = -EINVAL;
     goto exit;
   }
-
   stream = streams_.editValueAt(streamIdx);
   if (0 != res) {
     CAMERA_ERROR("%s: Can't return buffer to its stream: %s (%d)\n", __func__,
@@ -1461,7 +1447,7 @@ int32_t Camera3DeviceClient::ReturnStreamBuffer(StreamBuffer buffer) {
 exit:
 
   pthread_mutex_unlock(&lock_);
-  return res;
+  return ScopedAStatus::ok();
 }
 
 void Camera3DeviceClient::RemovePendingRequestLocked(uint32_t frameNumber) {
@@ -1480,14 +1466,14 @@ void Camera3DeviceClient::RemovePendingRequestLocked(uint32_t frameNumber) {
           sensorTS, frameNumber, shutterTS);
     }
 
-    ReturnOutputBuffers(request.pendingBuffers.array(),
+    ReturnOutputBuffers(request.pendingBuffers.data(),
                         request.pendingBuffers.size(), 0,
                         frameNumber);
 
     if (0 != request.status && (!request.isMetaPresent || shutterTS == 0)) {
       CAMERA_INFO("%s: Received error in the capture request. Added to the error"
           " requests vector.\n", __func__);
-      pending_error_requests_vector_.emplace(frameNumber, request);
+      pending_error_requests_vector_.emplace(frameNumber, std::move(request));
     }
 
     pending_requests_vector_.erase(frameNumber);
@@ -1507,21 +1493,17 @@ int32_t Camera3DeviceClient::GetCameraInfo(uint32_t idx, CameraMetadata *info) {
     return -ENODEV;
   }
 
-  ::android::hardware::camera::common::V1_0::Status status;
-  Return<void> ret = camera_device_->getCameraCharacteristics(
-      [&] (auto s, auto metadata) {
-        auto camera_metadata =
-          reinterpret_cast<const camera_metadata_t*>(metadata.data());
-        info->clear();
-        info->append(camera_metadata);
-        status = s;
-      });
-
-  if (!ret.isOk() || status != ::android::hardware::camera::common::V1_0::Status::OK) {
-    CAMERA_ERROR("%s: Error during camera static info query! \n", __func__);
-    return -ENODEV;
+  {
+    ::aidl::android::hardware::camera::device::CameraMetadata cameraCharacteristics;
+    ret_ = camera_device_->getCameraCharacteristics(&cameraCharacteristics);
+    if (!ret_.isOk()) {
+      CAMERA_ERROR("%s: Error during camera static info query! \n", __func__);
+      return -ENODEV;
+    }
+    auto camera_metadata = reinterpret_cast<camera_metadata_t*>(cameraCharacteristics.metadata.data());
+    info->clear();
+    info->append(camera_metadata);
   }
-
   return 0;
 }
 
@@ -1577,7 +1559,7 @@ int32_t Camera3DeviceClient::SubmitRequestList(std::list<Camera3Request> request
       CAMERA_ERROR("%s: Camera %d: Received invalid meta.\n", __func__, id_);
       res = -EINVAL;
       goto exit;
-    } else if (request.streamIds.isEmpty()) {
+    } else if (request.streamIds.empty()) {
       CAMERA_ERROR(
           "%s: Camera %d: Requests must have at least one"
           " stream.\n",
@@ -1586,9 +1568,10 @@ int32_t Camera3DeviceClient::SubmitRequestList(std::list<Camera3Request> request
       goto exit;
     }
 
-    Vector<int32_t> request_stream_id;
-    request_stream_id.appendVector(request.streamIds);
-    request_stream_id.sort(compare);
+    std::vector<int32_t> request_stream_id;
+    request_stream_id.insert(request_stream_id.end(), request.streamIds.begin(),
+                                 request.streamIds.end());
+    std::sort(request_stream_id.begin(), request_stream_id.end());
     int32_t prev_id = -1;
     int32_t input_stream_idx = -1;
     for (uint32_t i = 0; i < request_stream_id.size(); ++i) {
@@ -1617,8 +1600,8 @@ int32_t Camera3DeviceClient::SubmitRequestList(std::list<Camera3Request> request
       }
     }
 
-    if (0 <= input_stream_idx) {
-      request_stream_id.removeAt(input_stream_idx);
+    if (input_stream_idx >= 0 && input_stream_idx < request_stream_id.size()) {
+      request_stream_id.erase(request_stream_id.begin() + input_stream_idx);
     }
     metadata.update(ANDROID_REQUEST_OUTPUT_STREAMS, &request_stream_id[0],
                     request_stream_id.size());
@@ -1789,7 +1772,7 @@ int32_t Camera3DeviceClient::GenerateCaptureRequestLocked(
         return -ENOSYS;
     }
 
-    captureRequest.streams.push(stream);
+    captureRequest.streams.push_back(stream);
   }
   captureRequest.metadata.erase(ANDROID_REQUEST_OUTPUT_STREAMS);
 
@@ -1964,7 +1947,7 @@ int32_t Camera3DeviceClient::WaitUntilDrainedLocked() {
 
 void Camera3DeviceClient::InternalUpdateStatusLocked(State state) {
   state_ = state;
-  current_state_updates_.add(state_);
+  current_state_updates_.push_back(state_);
   pthread_cond_broadcast(&state_updated_);
 }
 
@@ -2099,33 +2082,33 @@ exit:
   return res;
 }
 
-Return<void> Camera3DeviceClient::processCaptureResult(
-    const hidl_vec<::android::hardware::camera::device::V3_2::CaptureResult>& results) {
-  for (const ::android::hardware::camera::device::V3_2::CaptureResult & result : results) {
+ScopedAStatus Camera3DeviceClient::processCaptureResult(
+    const std::vector<::aidl::android::hardware::camera::device::CaptureResult>& results) {
+  for (const ::aidl::android::hardware::camera::device::CaptureResult &result : results) {
     HandleCaptureResult(result);
   }
-  return Void();
+  return ScopedAStatus::ok();
 }
 
-Return<void> Camera3DeviceClient::notify(const hidl_vec<NotifyMsg>& messages) {
-  for (auto const& notify_msg : messages) {
-    switch (notify_msg.type) {
-      case ::android::hardware::camera::device::V3_2::MsgType::SHUTTER: {
-        NotifyShutter(notify_msg.msg.shutter);
-        break;
+ScopedAStatus Camera3DeviceClient::notify(const std::vector<NotifyMsg>& messages) {
+  size_t count = messages.size();
+  for (size_t i = 0; i < count; i++) {
+      const NotifyMsg& notify_msg = messages[i];
+      switch (notify_msg.getTag()) {
+          case NotifyMsg::Tag::error:
+              NotifyError(notify_msg.get<NotifyMsg::Tag::error>());
+              break;
+          case NotifyMsg::Tag::shutter:
+              NotifyShutter(notify_msg.get<NotifyMsg::Tag::shutter>());
+              break;
+          default:
+            SET_ERR("Unknown notify message from HAL");
       }
-      case ::android::hardware::camera::device::V3_2::MsgType::ERROR: {
-        NotifyError(notify_msg.msg.error);
-        break;
-      }
-      default:
-        SET_ERR("Unknown notify message from HAL: %d", notify_msg.type);
-    }
   }
-  return Void();
+  return ScopedAStatus::ok();
 }
 
-StreamConfigurationMode Camera3DeviceClient::GetOpMode() {
+  StreamConfigurationMode Camera3DeviceClient::GetOpMode() {
   CAMERA_DEBUG("%s: Enter: \n", __func__);
 
   uint32_t operation_mode = 0x00;

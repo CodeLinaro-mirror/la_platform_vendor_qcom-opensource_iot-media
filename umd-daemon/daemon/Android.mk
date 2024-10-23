@@ -26,6 +26,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 
 LOCAL_SHARED_LIBRARIES := \
     libqtiumd \
+    libbinder_ndk \
     libcamera_adaptor \
     libcamera_memory_interface \
     libcamera_utils \
@@ -37,27 +38,21 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libfmq \
     libhardware \
-    android.hardware.camera.provider@2.4 \
-    android.hardware.camera.device@1.0 \
-    android.hardware.camera.device@3.2 \
-    android.hardware.camera.metadata@3.4 \
     android.hardware.camera.common@1.0 \
     android.hardware.graphics.common@1.0 \
+    android.hardware.graphics.allocator@4.0 \
+    android.hardware.graphics.mapper@4.0 \
     android.hardware.graphics.common@1.0 \
     android.hardware.graphics.bufferqueue@2.0 \
-    vendor.qti.hardware.umd@1.0
-
-ifeq ($(call is-board-platform-in-list, kalama),true)
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@4.0
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@4.0
-LOCAL_CPPFLAGS += -DALLOCATOR_IMAPPER_V4
-else
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@3.0
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@3.0
-endif
+    vendor.qti.hardware.umd@1.0 \
+    android.hardware.camera.device-V1-ndk \
+    android.hardware.camera.metadata-V1-ndk \
+    android.hardware.camera.provider-V1-ndk \
+    android.hardware.camera.common-V1-ndk
 
 LOCAL_STATIC_LIBRARIES := \
-    android.hardware.camera.common@1.0-helper
+    android.hardware.camera.common@1.0-helper \
+    libaidlcommonsupport
 
 LOCAL_HEADER_LIBRARIES := libqtiumdheaders
 

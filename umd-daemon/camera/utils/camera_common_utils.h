@@ -27,6 +27,12 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
 #include <chrono>
@@ -66,7 +72,7 @@ struct StreamBuffer {
   uint32_t frame_number;
   uint32_t camera_id;
   int32_t  stream_id;
-  DataspaceFlags data_space;
+  Dataspace data_space;
   IBufferHandle handle;
   int32_t fd;
   uint32_t size;

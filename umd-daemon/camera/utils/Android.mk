@@ -11,7 +11,10 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 
 LOCAL_SHARED_LIBRARIES := \
     libutils \
-    liblog
+    liblog \
+    libbinder_ndk
+
+LOCAL_STATIC_LIBRARIES := libaidlcommonsupport
 
 LOCAL_CPPFLAGS += -fexceptions
 

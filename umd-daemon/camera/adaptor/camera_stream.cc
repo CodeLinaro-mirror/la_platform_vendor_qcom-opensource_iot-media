@@ -19,6 +19,12 @@
  * limitations under the License.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "camera_utils.h"
 #include "camera_monitor.h"
 #include "camera_stream.h"
@@ -64,8 +70,9 @@ Camera3Stream::Camera3Stream(int id, size_t maxSize,
     static_cast<PixelFormat>(outputConfiguration.format);
   camera_stream_.dataSpace = outputConfiguration.data_space;
   camera_stream_.rotation = outputConfiguration.rotation;
-  camera_stream_.usage = static_cast<BufferUsageFlags>(
+  camera_stream_.usage = static_cast<BufferUsage>(
     AllocUsageFactory::GetAllocUsage().ToLocal(outputConfiguration.allocFlags));
+  camera_stream_.groupId = -1;
   stream_max_buffers_ = outputConfiguration.bufferCount;
 
   if ((PixelFormat::BLOB == camera_stream_.format) && (0 == maxSize)) {
@@ -119,7 +126,7 @@ Stream *Camera3Stream::BeginConfigure() {
   }
 
   camera_stream_.usage =
-    AllocUsageFactory::GetAllocUsage().ToLocal(client_usage_);
+    static_cast<BufferUsage>(AllocUsageFactory::GetAllocUsage().ToLocal(client_usage_));
   stream_max_buffers_ = client_max_buffers_;
 
   if (monitor_id_ != Camera3Monitor::INVALID_ID) {
@@ -233,7 +240,7 @@ int32_t Camera3Stream::AbortConfigure() {
       goto exit;
   }
 
-  camera_stream_.usage = static_cast<BufferUsageFlags>(
+  camera_stream_.usage = static_cast<BufferUsage>(
     AllocUsageFactory::GetAllocUsage().ToLocal(old_usage_));
   stream_max_buffers_ = old_max_buffers_;
 
@@ -407,7 +414,7 @@ exit:
   return res;
 }
 
-int32_t Camera3Stream::GetBuffer(::android::hardware::camera::device::V3_2::StreamBuffer *buffer,
+int32_t Camera3Stream::GetBuffer(::aidl::android::hardware::camera::device::StreamBuffer *buffer,
     int64_t frame_number) {
   int32_t res = 0;
 
@@ -612,7 +619,7 @@ int32_t Camera3Stream::PopulateMetaInfo(CameraBufferMetaData &info,
   return 0;
 }
 
-void Camera3Stream::ReturnBufferToClient(const ::android::hardware::camera::device::V3_2::StreamBuffer &buffer,
+void Camera3Stream::ReturnBufferToClient(const ::aidl::android::hardware::camera::device::StreamBuffer &buffer,
                                          int64_t timestamp,
                                          int64_t frame_number) {
   assert(nullptr != callbacks_);
@@ -620,8 +627,8 @@ void Camera3Stream::ReturnBufferToClient(const ::android::hardware::camera::devi
   pthread_mutex_lock(&lock_);
 
   hal_buffer_cnt_--;
-  client_buffer_cnt_++;
 
+  client_buffer_cnt_++;
   StreamBuffer b;
   memset(&b, 0, sizeof(b));
   b.timestamp = timestamp;
@@ -715,7 +722,7 @@ int32_t Camera3Stream::ReturnBufferLocked(const StreamBuffer &buffer) {
   return 0;
 }
 
-int32_t Camera3Stream::GetBufferLocked(::android::hardware::camera::device::V3_2::StreamBuffer *streamBuffer,
+int32_t Camera3Stream::GetBufferLocked(::aidl::android::hardware::camera::device::StreamBuffer *streamBuffer,
     int64_t frame_number) {
   int32_t idx = -1;
   if ((status_ != STATUS_CONFIGURED) && (status_ != STATUS_CONFIG_ACTIVE) &&
@@ -796,14 +803,13 @@ int32_t Camera3Stream::GetBufferLocked(::android::hardware::camera::device::V3_2
 
   if (NULL != streamBuffer) {
     streamBuffer->streamId = id_;
-    streamBuffer->acquireFence = hidl_handle();
-    streamBuffer->releaseFence = hidl_handle();
+    streamBuffer->acquireFence = ::aidl::android::hardware::common::NativeHandle();
+    streamBuffer->releaseFence = ::aidl::android::hardware::common::NativeHandle();
     streamBuffer->status = BufferStatus::OK;
-
-    streamBuffer->buffer = hidl_handle(GetAllocBufferHandle(mem_alloc_slots_[idx]));
+    streamBuffer->buffer = dupToAidl(GetAllocBufferHandle(mem_alloc_slots_[idx]));
 
     streamBuffer->bufferId = idx;
-    buffers_map[frame_number] = mem_alloc_slots_[idx];
+    buffers_map.emplace(frame_number, mem_alloc_slots_[idx]);
 
     if (pending_buffer_count_ == 0 && status_ != STATUS_CONFIG_ACTIVE &&
         status_ != STATUS_RECONFIG_ACTIVE) {

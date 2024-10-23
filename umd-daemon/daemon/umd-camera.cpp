@@ -63,6 +63,12 @@
 # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "umd-camera.h"
 #include "umd-logging.h"
 
@@ -103,6 +109,7 @@ const uint32_t C2_REFRESH_PERIOD = 0;
 const uint64_t FPS_TIME_INTERVAL = 3000000;
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
 uint32_t umd_latency_log;
+std::map<int32_t, StreamBuffer> bufferMap;
 
 #ifdef ENABLE_H264
 class UmdC2Notifier : public IC2Notifier {
@@ -126,7 +133,12 @@ class UmdC2Notifier : public IC2Notifier {
 
     const C2ConstLinearBlock block = c2buffer->data().linearBlocks().front();
     const C2ReadView view = block.map().get();
-    mFrameCb((uint8_t*)view.data(), block.size(), timestamp);
+    auto it = bufferMap.find(index);
+    if (it != bufferMap.end()) {
+      //remove from map
+      mFrameCb((uint8_t*)view.data(), block.size(), timestamp, it->second);
+      bufferMap.erase(it);
+    }
   }
 
  private:
@@ -283,7 +295,7 @@ int32_t UmdCamera::InitializeCamera() {
     return -ENODEV;
   }
 
-  mDeviceClient = new Camera3DeviceClient(mClientCb);
+  mDeviceClient = ndk::SharedRefBase::make<Camera3DeviceClient>(mClientCb);
   if (nullptr == mDeviceClient.get()) {
     UMD_LOG_ERROR("Invalid camera device client!\n");
     return -ENOMEM;
@@ -1243,14 +1255,11 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
         std::list<std::unique_ptr<C2Param>> settings;
 
         c2buffer = ImportGraphicBuffer(buffer);
-
+        bufferMap.insert(std::make_pair(index, buffer));
         if (c2buffer == nullptr)
           UMD_LOG_ERROR ("Failed to create c2buffer\n");
         else
           mC2Module->Queue(c2buffer, settings, index, timestamp, flags);
-
-        mAllocDeviceInterface->UnmapBuffer(buffer.handle);
-        mDeviceClient->ReturnStreamBuffer(buffer);
         return;
       }
 #endif
@@ -1341,9 +1350,18 @@ void UmdCamera::videoBufferLoop() {
 void UmdCamera::codecVideoBufferLoop() {
   while (mActive || mCodecVideoBufferQueue.size()) {
     int32_t bufidx;
-
-    if (!mCodecVideoBufferQueue.pop(bufidx))
+    std::pair<StreamBuffer, int32_t> buffer_pair;
+    if (!mCodecVideoBufferQueue.pop(buffer_pair)) {
+      StreamBuffer buffer = buffer_pair.first;
+      int32_t bufidx = buffer_pair.second;
       umd_gadget_wait_buffer (mGadget, UMD_VIDEO_STREAM_ID, bufidx);
+      if (buffer.handle == nullptr) {
+        UMD_LOG_ERROR("Invalid buffer handle\n");
+        continue;
+      }
+      mAllocDeviceInterface->UnmapBuffer(buffer.handle);
+      mDeviceClient->ReturnStreamBuffer(buffer);
+    }
   }
 
   UMD_LOG_INFO("codecVideoBufferLoop terminate!\n");
@@ -1419,7 +1437,7 @@ bool UmdCamera::CameraStart() {
     return false;
   }
 
-  mRequest.streamIds.add(mStreamId);
+  mRequest.streamIds.push_back(mStreamId);
 
   ret = mDeviceClient->EndConfigure(config);
   if (0 != ret) {
@@ -1659,11 +1677,11 @@ bool UmdCamera::InitializeCodec() {
   }
 
   UmdFrameCallback umdFrameCb = [&](uint8_t* data, uint32_t size, uint64_t
-    timestamp) {
+    timestamp, StreamBuffer &buffer) {
     uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
         data, size, size, timestamp);
     PrintFPS();
-    mCodecVideoBufferQueue.push(bufidx); };
+    mCodecVideoBufferQueue.push(std::make_pair (buffer, bufidx)); };
 
   std::shared_ptr<IC2Notifier> notifier = std::make_shared<UmdC2Notifier>(
     umdFrameCb);

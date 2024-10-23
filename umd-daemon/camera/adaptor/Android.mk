@@ -27,6 +27,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS += $(LOCAL_PATH)/../include
 
 LOCAL_SHARED_LIBRARIES := \
     libhidlbase \
+    libbinder_ndk \
     libhwbinder \
     libui \
     libbinder \
@@ -38,23 +39,26 @@ LOCAL_SHARED_LIBRARIES := \
     libc++ \
     libcamera_utils \
     libcamera_memory_interface \
-    android.hardware.camera.provider@2.4 \
-    android.hardware.camera.device@1.0 \
-    android.hardware.camera.device@3.2 \
-    android.hardware.camera.metadata@3.4 \
+    camx.provider-impl \
+    camx.device-impl \
+    android.hardware.camera.provider-V1-ndk \
     android.hardware.camera.common@1.0 \
-    android.hardware.graphics.common@1.0
-
-ifeq ($(call is-board-platform-in-list, kalama),true)
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@4.0
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@4.0
-LOCAL_CPPFLAGS += -DALLOCATOR_IMAPPER_V4
-else
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@3.0
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@3.0
-endif
+    android.hardware.graphics.common@1.0 \
+    android.hardware.graphics.allocator@4.0 \
+    android.hardware.graphics.mapper@4.0 \
+    android.hardware.camera.device-V1-ndk \
+    android.hardware.camera.metadata-V1-ndk \
+    android.hidl.allocator@1.0 \
+    libhidlmemory \
+    libgralloctypes
 
 LOCAL_STATIC_LIBRARIES := \
-    android.hardware.camera.common@1.0-helper
+    android.hardware.camera.common@1.0-helper \
+    libaidlcommonsupport \
+    android.hardware.camera.common-V1-ndk \
+    android.hardware.common-V2-ndk \
+    android.hardware.common.fmq-V1-ndk \
+    android.hardware.graphics.common-V3-ndk \
+    libgrallocusage
 
 include $(BUILD_SHARED_LIBRARY)

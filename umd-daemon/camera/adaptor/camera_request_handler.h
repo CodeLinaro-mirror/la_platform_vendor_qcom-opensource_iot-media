@@ -18,6 +18,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #ifndef CAMERA3REQUESTHANDLER_H_
 #define CAMERA3REQUESTHANDLER_H_
 
@@ -52,7 +59,7 @@ class Camera3RequestHandler : public ThreadHelper {
   Camera3RequestHandler(Camera3Monitor &monitor);
   virtual ~Camera3RequestHandler();
 
-  int32_t Initialize(sp<ICameraDeviceSession> session,
+  int32_t Initialize(std::shared_ptr<ICameraDeviceSession> session,
                      ErrorCallback error_cb,
                      MarkRequest mark_cb, SetError set_error);
 
@@ -84,9 +91,9 @@ class Camera3RequestHandler : public ThreadHelper {
  private:
   int32_t GetRequest(CaptureRequest &request);
   int32_t SubmitRequest(CaptureRequest &nextRequest,
-                        ::android::hardware::camera::device::V3_2::StreamBuffer *in_buf = nullptr);
+                        ::aidl::android::hardware::camera::device::StreamBuffer *in_buf = nullptr);
   void ClearCaptureRequest(CaptureRequest &request);
-  void HandleErrorRequest(::android::hardware::camera::device::V3_2::CaptureRequest &request,
+  void HandleErrorRequest(::aidl::android::hardware::camera::device::CaptureRequest &request,
                           CaptureRequest &nextRequest);
 
   bool WaitOnPause();
@@ -104,7 +111,7 @@ class Camera3RequestHandler : public ThreadHelper {
   ErrorCallback error_cb_;
   MarkRequest mark_cb_;
   SetError set_error_;
-  sp<ICameraDeviceSession> camera_session_;
+  std::shared_ptr<ICameraDeviceSession> camera_session_;
 
   pthread_mutex_t lock_;
   pthread_cond_t requests_signal_;

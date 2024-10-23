@@ -18,10 +18,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include <camera_utils.h>
+#include <CameraMetadata.h>
 #include <camera_device_client.h>
 #include <camera_request_handler.h>
 #include "utils/camera_log.h"
+#include <aidl/android/hardware/camera/device/ICameraDevice.h>
+#include <aidl/android/hardware/camera/metadata/CameraMetadataTag.h>
+#include <hidl/HidlSupport.h>
+
+#define LOG_TAG "CameraRequestHandler"
 
 #define SIG_ERROR(fmt, ...) \
   SignalError("%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
@@ -79,7 +92,7 @@ Camera3RequestHandler::~Camera3RequestHandler() {
   pthread_mutex_destroy(&lock_);
 }
 
-int32_t Camera3RequestHandler::Initialize(sp<ICameraDeviceSession> session,
+int32_t Camera3RequestHandler::Initialize(std::shared_ptr<ICameraDeviceSession> session,
                                           ErrorCallback error_cb,
                                           MarkRequest mark_cb,
                                           SetError set_error) {
@@ -312,11 +325,11 @@ void Camera3RequestHandler::ReprocLoop(Camera3RequestHandler *ctx) {
       nextRequest.input->buffers_map.insert(
           std::make_pair(in_buf_handle, in_buf.handle));
 
-      ::android::hardware::camera::device::V3_2::StreamBuffer inbuf;
+      ::aidl::android::hardware::camera::device::StreamBuffer inbuf;
       inbuf.streamId = in_buf.stream_id;
       inbuf.acquireFence = hidl_handle();
       inbuf.releaseFence = hidl_handle();
-      inbuf.status = BufferStatus::OK;
+      inbuf.status = aidl::android::hardware::camera::device::BufferStatus::OK;
       inbuf.buffer = hidl_handle(in_buf_handle);
       inbuf.bufferId = in_buf.frame_number;
 
@@ -332,24 +345,23 @@ void Camera3RequestHandler::ReprocLoop(Camera3RequestHandler *ctx) {
 }
 
 int32_t Camera3RequestHandler::SubmitRequest(CaptureRequest &nextRequest,
-    ::android::hardware::camera::device::V3_2::StreamBuffer *in_buf) {
+    ::aidl::android::hardware::camera::device::StreamBuffer *in_buf) {
 
   int32_t res = 0;
-
-  ::android::hardware::camera::device::V3_2::CaptureRequest request{};
+  std::vector<::aidl::android::hardware::camera::device::CaptureRequest> requests(1);
+  ::aidl::android::hardware::camera::device::CaptureRequest &request = requests[0];
   request.frameNumber = nextRequest.resultExtras.frameNumber;
   request.fmqSettingsSize = 0;
-  std::vector<::android::hardware::camera::device::V3_2::StreamBuffer> outputBuffers;
-
+  std::vector<aidl::android::hardware::camera::device::StreamBuffer> outputBuffers;
+  const camera_metadata_t* meta_data;
   if (old_request_.resultExtras.requestId !=
       nextRequest.resultExtras.requestId)
   {
     nextRequest.metadata.sort();
-
-    const camera_metadata_t *metadata = nextRequest.metadata.getAndLock();
-    request.settings.setToExternal(
-        reinterpret_cast<uint8_t *> (const_cast<camera_metadata_t *>(metadata)),
-        get_camera_metadata_size(metadata));
+    meta_data = nextRequest.metadata.getAndLock();
+    uint8_t* rawSettingsBuffer = (uint8_t*)meta_data;
+    request.settings.metadata.assign(rawSettingsBuffer,
+                      rawSettingsBuffer + get_camera_metadata_size(meta_data));
     old_request_ = nextRequest;
   }
 
@@ -357,11 +369,10 @@ int32_t Camera3RequestHandler::SubmitRequest(CaptureRequest &nextRequest,
 
   // Handle output buffers
   for (int i = 0; i < nextRequest.streams.size(); i++) {
-    outputBuffers.push_back(::android::hardware::camera::device::V3_2::StreamBuffer());
+    outputBuffers.push_back(::aidl::android::hardware::camera::device::StreamBuffer());
   }
-
   for (size_t i = 0; i < nextRequest.streams.size(); i++) {
-    res = nextRequest.streams.editItemAt(i)
+    res = nextRequest.streams[i]
               ->GetBuffer(&outputBuffers[i], request.frameNumber);
     if (0 != res) {
       CAMERA_ERROR(
@@ -378,8 +389,9 @@ int32_t Camera3RequestHandler::SubmitRequest(CaptureRequest &nextRequest,
       return res;
     }
   }
-  request.outputBuffers = outputBuffers;
+
   totalNumBuffers += outputBuffers.size();
+  request.outputBuffers = std::move(outputBuffers);
 
   if (nullptr == mark_cb_) {
     HandleErrorRequest(request, nextRequest);
@@ -387,7 +399,7 @@ int32_t Camera3RequestHandler::SubmitRequest(CaptureRequest &nextRequest,
   }
 
   if (in_buf) {
-    request.inputBuffer = *in_buf;
+    request.inputBuffer = std::move(*in_buf);
     totalNumBuffers++;
   }
 
@@ -401,26 +413,20 @@ int32_t Camera3RequestHandler::SubmitRequest(CaptureRequest &nextRequest,
     return res;
   }
 
-  ::android::hardware::camera::common::V1_0::Status status =
-    ::android::hardware::camera::common::V1_0::Status::INTERNAL_ERROR;
+  Status status = Status::INTERNAL_ERROR;
   uint32_t request_processed = 0;
-  hidl_vec<::android::hardware::camera::device::V3_2::BufferCache> cashes_to_remove;
-  android::hardware::Return<void> ret = camera_session_->processCaptureRequest(
-      {request}, cashes_to_remove, [&status, &request_processed](auto s,
-              uint32_t n) {
-        status = s;
-        request_processed = n;
-      });
-
-  if (!ret.isOk() || status != ::android::hardware::camera::common::V1_0::Status::OK) {
-    SIG_ERROR("%s: Unable to submit request %d in CameraHal : %d",
+  std::vector<::aidl::android::hardware::camera::device::BufferCache> cachesToRemove;
+  int32_t numRequestProcessed = 0;
+  ndk::ScopedAStatus ret =
+                camera_session_->processCaptureRequest(requests, cachesToRemove, &numRequestProcessed);
+  if (!ret.isOk()) {
+    CAMERA_ERROR("%s: Unable to submit request %d in CameraHal : %d",
               __func__, request.frameNumber, (int)status);
     HandleErrorRequest(request, nextRequest);
     return res;
   }
-
-  if (request.settings != NULL) {
-    nextRequest.metadata.unlock((const camera_metadata_t *)request.settings.data());
+  if (reinterpret_cast<camera_metadata_t*>(request.settings.metadata.data()) != nullptr) {
+    nextRequest.metadata.unlock(meta_data);
   }
 
   pthread_mutex_lock(&lock_);
@@ -435,7 +441,7 @@ bool Camera3RequestHandler::IsStreamActive(Camera3Stream &stream) {
   bool res = false;
   pthread_mutex_lock(&lock_);
 
-  if (!current_request_.streams.isEmpty()) {
+  if (!current_request_.streams.empty()) {
     for (const auto &s : current_request_.streams) {
       if (stream.GetId() == s->GetId()) {
         res = true;
@@ -471,21 +477,21 @@ exit:
 }
 
 void Camera3RequestHandler::HandleErrorRequest(
-    ::android::hardware::camera::device::V3_2::CaptureRequest &request,
+    ::aidl::android::hardware::camera::device::CaptureRequest &request,
     CaptureRequest &nextRequest) {
-  if (request.settings != NULL) {
-    nextRequest.metadata.unlock((const camera_metadata_t *)request.settings.data());
+  if (reinterpret_cast<camera_metadata_t*>(request.settings.metadata.data()) != nullptr) {
+    nextRequest.metadata.unlock((const camera_metadata_t *)request.settings.metadata.data());
   }
 
   for (size_t i = 0; i < request.outputBuffers.size(); i++) {
-    request.outputBuffers[i].status = BufferStatus::ERROR;
+    request.outputBuffers[i].status = aidl::android::hardware::camera::device::BufferStatus::ERROR;
     StreamBuffer b;
     memset(&b, 0, sizeof(b));
     b.handle =
-      nextRequest.streams.editItemAt(i)->buffers_map[request.frameNumber];
-    nextRequest.streams.editItemAt(i)->
+      nextRequest.streams[i]->buffers_map[request.frameNumber];
+    nextRequest.streams[i]->
       buffers_map.erase(request.frameNumber);
-    nextRequest.streams.editItemAt(i)->ReturnBuffer(b);
+    nextRequest.streams[i]->ReturnBuffer(b);
   }
 
   pthread_mutex_lock(&lock_);
