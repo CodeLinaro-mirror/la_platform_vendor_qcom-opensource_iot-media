@@ -19,18 +19,26 @@
  * limitations under the License.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #ifndef CAMERA3DEVICE_H_
 #define CAMERA3DEVICE_H_
 
 #include <pthread.h>
-#include <CameraMetadata.h>
 #include <utils/KeyedVector.h>
+#include <algorithm>
+#include <vector>
 #include <utils/List.h>
 #include <utils/RefBase.h>
 #include <VendorTagDescriptor.h>
 #include <mutex>
-
+#include <CameraMetadata.h>
 #include <fmq/MessageQueue.h>
+#include <aidl/android/hardware/camera/device/BnCameraDeviceCallback.h>
 
 #ifdef TARGET_USES_GBM
 #include <gbm.h>
@@ -47,10 +55,17 @@
 
 #include "camera_defs.h"
 
+#include <aidl/android/hardware/camera/provider/ICameraProvider.h>
+#include <aidl/android/hardware/camera/device/ICameraDevice.h>
+#include <fmq/AidlMessageQueue.h>
+
 #define CAMERA_TEMPLATE_COUNT 10
 
 using namespace android;
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
+using ::aidl::android::hardware::camera::provider::ICameraProvider;
+using ::aidl::android::hardware::camera::device::CaptureRequest;
+using ::ndk::ScopedAStatus;
 
 namespace camera {
 
@@ -58,9 +73,9 @@ namespace adaptor {
 
 using ::android::hardware::MessageQueue;
 using ::android::hardware::kSynchronizedReadWrite;
-using ResultMetadataQueue = MessageQueue<uint8_t, kSynchronizedReadWrite>;
+using ResultMetadataQueue = android::AidlMessageQueue<int8_t, SynchronizedReadWrite>;
 
-class Camera3DeviceClient : public ICameraDeviceCallback {
+class Camera3DeviceClient : public BnCameraDeviceCallback {
  public:
   Camera3DeviceClient(CameraClientCallbacks clientCb);
   virtual ~Camera3DeviceClient();
@@ -85,9 +100,9 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   int32_t SubmitRequestList(std::list<Camera3Request> requests,
                             bool streaming = false,
                             int64_t *lastFrameNumber = NULL);
-  int32_t ReturnStreamBuffer(StreamBuffer buffer);
+  ScopedAStatus ReturnStreamBuffer(StreamBuffer buffer);
+  ScopedAStatus returnStreamBuffers(const std::vector<::aidl::android::hardware::camera::device::StreamBuffer>& in_buffers) override;
   int32_t CancelRequest(int requestId, int64_t *lastFrameNumber = NULL);
-
   int32_t GetCameraInfo(uint32_t idx, CameraMetadata *info);
   int32_t GetNumberOfCameras() { return number_of_cameras_; }
   const std::vector<int32_t> GetRequestIds(){ return current_request_ids_; }
@@ -96,6 +111,7 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   int32_t Flush(int64_t *lastFrameNumber = NULL);
   int32_t Prepare(int streamId);
   int32_t TearDown(int streamId);
+  std::shared_ptr<Camera3DeviceClient> cameraClientCallback_;
 
  private:
   std::vector<int32_t> current_request_ids_;
@@ -117,11 +133,14 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   int32_t AddRequestListLocked(const List<const CameraMetadata> &requests,
                                bool streaming, int64_t *lastFrameNumber = NULL);
 
-  void HandleCaptureResult(const ::android::hardware::camera::device::V3_2::CaptureResult &result);
-  void NotifyError(const ErrorMsg &msg);
-  void NotifyShutter(const ShutterMsg &msg);
+  void HandleCaptureResult(const ::aidl::android::hardware::camera::device::CaptureResult &result);
+  ScopedAStatus NotifyError(const ErrorMsg &msg);
+  ScopedAStatus NotifyShutter(const ShutterMsg &msg);
+  ScopedAStatus requestStreamBuffers(const std::vector<::aidl::android::hardware::camera::device::BufferRequest>& bufReqs,
+                                       std::vector<::aidl::android::hardware::camera::device::StreamBufferRet>* buffers,
+                                       ::aidl::android::hardware::camera::device::BufferRequestStatus* _aidl_return) override;
   void RemovePendingRequestLocked(uint32_t frameNumber);
-  void ReturnOutputBuffers(const ::android::hardware::camera::device::V3_2::StreamBuffer *outputBuffers,
+  void ReturnOutputBuffers(const ::aidl::android::hardware::camera::device::StreamBuffer *outputBuffers,
                            size_t numBuffers, int64_t timestamp,
                            int64_t frame_number);
   void SendCaptureResult(CameraMetadata &pendingMetadata,
@@ -150,10 +169,9 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   void SetErrorStateLocked(const char *fmt, ...);
   void SetErrorStateLockedV(const char *fmt, va_list args);
 
-  Return<void> processCaptureResult(
-      const hidl_vec<::android::hardware::camera::device::V3_2::CaptureResult>& results) override;
-  Return<void> notify(
-      const hidl_vec<NotifyMsg>& messages) override;
+  ScopedAStatus processCaptureResult(const std::vector<::aidl::android::hardware::camera::device::CaptureResult>& results) override;
+  ScopedAStatus notify(const std::vector<NotifyMsg>& messages) override;
+
 
   int32_t MarkPendingRequest(uint32_t frameNumber, int32_t numBuffers,
                              CaptureResultExtras resultExtras);
@@ -194,7 +212,7 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   bool flush_on_going_;
 
   KeyedVector<int, Camera3Stream *> streams_;
-  Vector<Camera3Stream *> deleted_streams_;
+  std::vector<Camera3Stream *> deleted_streams_;
 
   int next_stream_id_;
   bool reconfig_;
@@ -203,18 +221,19 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   static const int32_t JPEG_BUFFER_SIZE_MIN =
       256 * 1024 + 6 /*sizeof(camera3_jpeg_blob)*/;
 
-  sp<ICameraProvider> camera_provider_;
-  sp<ICameraDevice> camera_device_;
-  sp<ICameraDeviceSession> camera_session_;
-  std::unique_ptr<ResultMetadataQueue> result_metadata_queue_;
+  std::shared_ptr<ICameraProvider> camera_provider_;
+  CameraMetadata device_info_;
+  ScopedAStatus ret_;
+  std::shared_ptr<ICameraDevice> camera_device_;
+  std::shared_ptr<ICameraDeviceSession> camera_session_;
+  std::shared_ptr<ResultMetadataQueue> result_metadata_queue_;
 
   std::vector<std::string> camera_device_names_;
 
   uint32_t number_of_cameras_;
-  CameraMetadata device_info_;
   IAllocDevice* alloc_device_interface_;
 
-  Vector<int32_t> repeating_requests_;
+  std::vector<int32_t> repeating_requests_;
   int32_t next_request_id_;
   uint32_t frame_number_;
   uint32_t next_shutter_frame_number_;
@@ -228,7 +247,7 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
   Camera3RequestHandler request_handler_;
 
   bool pause_state_notify_;
-  Vector<State> current_state_updates_;
+  std::vector<State> current_state_updates_;
   int state_listeners_;
   pthread_cond_t state_updated_;
   static const int64_t WAIT_FOR_SHUTDOWN = 5e9;  // 5 sec.

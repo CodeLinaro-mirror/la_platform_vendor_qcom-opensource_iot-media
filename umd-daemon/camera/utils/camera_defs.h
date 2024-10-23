@@ -1,10 +1,4 @@
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- */
-
-/*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,61 +27,68 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
-#include <android/hardware/camera/device/3.2/types.h>
-#include <android/hardware/camera/device/3.2/ICameraDevice.h>
-#include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
-#include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
-
-#include <android/hardware/camera/provider/2.4/ICameraProvider.h>
-
-#ifdef ALLOCATOR_IMAPPER_V4
+#include <aidl/android/hardware/camera/device/ICameraDevice.h>
+#include <aidlcommonsupport/NativeHandle.h>
+#include <CameraMetadata.h>
+#include <aidl/android/hardware/camera/device/CaptureResult.h>
+#include <aidl/android/hardware/camera/device/ErrorCode.h>
+#include <aidl/android/hardware/camera/device/PhysicalCameraMetadata.h>
+#include <aidl/android/hardware/camera/device/Stream.h>
+#include <aidl/android/hardware/camera/device/NotifyMsg.h>
+#include <aidl/android/hardware/camera/device/HalStream.h>
+#include <aidl/android/hardware/camera/device/ErrorCode.h>
+#include <aidl/android/hardware/camera/common/Status.h>
+#include <aidl/android/hardware/camera/metadata/CameraMetadataTag.h>
+#include <aidl/android/hardware/camera/common/VendorTagSection.h>
+#include <hidl/HidlSupport.h>
+#include <aidl/android/hardware/graphics/common/BufferUsage.h>
+#include <aidl/android/hardware/graphics/common/PixelFormat.h>
 #include <android/hardware/graphics/allocator/4.0/IAllocator.h>
 #include <android/hardware/graphics/mapper/4.0/IMapper.h>
 #include <android/hardware/graphics/mapper/4.0/types.h>
-using namespace ::android::hardware::graphics::allocator::V4_0;
-using namespace ::android::hardware::graphics::mapper::V4_0;
-#else
-#include <android/hardware/graphics/allocator/3.0/IAllocator.h>
-#include <android/hardware/graphics/mapper/3.0/IMapper.h>
-#include <android/hardware/graphics/mapper/3.0/types.h>
-using namespace ::android::hardware::graphics::allocator::V3_0;
-using namespace ::android::hardware::graphics::mapper::V3_0;
-#endif
-
-#include <CameraMetadata.h>
-
-using ::android::hardware::camera::common::V1_0::helper::CameraMetadata;
-
-using namespace ::android::hardware::camera;
+#include <aidl/android/hardware/graphics/common/Dataspace.h>
+#include <aidl/android/hardware/camera/device/BnCameraDeviceCallback.h>
 
 using ::android::hardware::hidl_handle;
-using ::android::hardware::hidl_vec;
 using ::android::hardware::hidl_string;
+using ::android::hardware::hidl_vec;
 
-using ::android::hardware::Void;
+using ::aidl::android::hardware::graphics::common::BufferUsage;
+using ::android::hardware::camera::common::V1_0::helper::CameraMetadata;
+using namespace ::android::hardware::camera;
 using ::android::hardware::Return;
+using ::android::hardware::Void;
 
-using ::android::hardware::graphics::common::V1_0::PixelFormat;
-
-using ::android::hardware::camera::provider::V2_4::ICameraProvider;
-using ::android::hardware::camera::provider::V2_4::ICameraProviderCallback;
-
-using ::android::hardware::camera::device::V3_2::ICameraDevice;
-using ::android::hardware::camera::device::V3_2::ICameraDeviceSession;
-using ::android::hardware::camera::device::V3_2::ICameraDeviceCallback;
-using ::android::hardware::camera::device::V3_2::StreamConfigurationMode;
-using ::android::hardware::camera::device::V3_2::HalStreamConfiguration;
-using ::android::hardware::camera::device::V3_2::RequestTemplate;
-using ::android::hardware::camera::device::V3_2::NotifyMsg;
-using ::android::hardware::camera::device::V3_2::ShutterMsg;
-using ::android::hardware::camera::device::V3_2::Stream;
-using ::android::hardware::camera::device::V3_2::StreamType;
-using ::android::hardware::camera::device::V3_2::BufferStatus;
-using ::android::hardware::camera::device::V3_2::ErrorCode;
-using ::android::hardware::camera::device::V3_2::ErrorMsg;
-using ::android::hardware::camera::device::V3_2::BufferUsageFlags;
-using ::android::hardware::camera::device::V3_2::DataspaceFlags;
-using ::android::hardware::camera::device::V3_2::StreamRotation;
-using android::hardware::camera::device::V3_2::RequestTemplate;
+using ::aidl::android::hardware::camera::common::Status;
+using ::aidl::android::hardware::camera::common::VendorTagSection;
+using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
+using ::aidl::android::hardware::camera::device::BufferCache;
+using ::aidl::android::hardware::camera::device::BufferRequestStatus;
+using ::aidl::android::hardware::camera::device::BufferStatus;
+using ::aidl::android::hardware::camera::device::ErrorCode;
+using ::aidl::android::hardware::camera::device::ErrorMsg;
+using ::aidl::android::hardware::camera::device::HalStream;
+using ::aidl::android::hardware::camera::device::ICameraDevice;
+using ::aidl::android::hardware::camera::device::ICameraDeviceCallback;
+using ::aidl::android::hardware::camera::device::ICameraDeviceSession;
+using ::aidl::android::hardware::camera::device::NotifyMsg;
+using ::aidl::android::hardware::camera::device::RequestTemplate;
+using ::aidl::android::hardware::camera::device::ShutterMsg;
+using ::aidl::android::hardware::camera::device::Stream;
+using ::aidl::android::hardware::camera::device::StreamBufferRet;
+using ::aidl::android::hardware::camera::device::StreamConfigurationMode;
+using ::aidl::android::hardware::camera::device::StreamRotation;
+using ::aidl::android::hardware::camera::device::StreamType;
+using ::aidl::android::hardware::camera::metadata::CameraMetadataTag;
+using ::aidl::android::hardware::graphics::common::BufferUsage;
+using ::aidl::android::hardware::graphics::common::Dataspace;
+using ::aidl::android::hardware::graphics::common::PixelFormat;
+using ::ndk::SpAIBinder;

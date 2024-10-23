@@ -30,17 +30,25 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
 #include <VendorTagDescriptor.h>
 #include <android/hardware/camera/common/1.0/types.h>
+#include <aidl/android/hardware/camera/common/VendorTagSection.h>
+#include<vector>
 
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
-using ::android::hardware::camera::common::V1_0::VendorTagSection;
+using ::aidl::android::hardware::camera::common::VendorTagSection;
 
 class CustomVendorTagDescriptor : public VendorTagDescriptor {
  public:
    static android::status_t createDescriptorFromHidl(
-           const android::hardware::hidl_vec<VendorTagSection>& vts,
+           const std::vector<VendorTagSection> &vts,
            android::sp<VendorTagDescriptor>& descriptor);
 };

@@ -1,10 +1,4 @@
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
- * SPDX-License-Identifier: BSD-3-Clause-Clear
- */
-
-/*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,11 +27,16 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "allocator_hidl_interface.h"
 #include <dlfcn.h>
 #include "utils/camera_log.h"
 
-using ::android::hardware::hidl_vec;
 using ::android::hardware::Void;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_handle;
@@ -113,6 +112,7 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
   HidlAllocBuffer *buffer = new HidlAllocBuffer;
   handle = buffer;
 
+  hidl_vec<uint8_t> descriptor;
   IMapper::BufferDescriptorInfo descriptor_info {};
 
   descriptor_info.width = width;
@@ -123,17 +123,10 @@ MemAllocError HidlAllocDevice::AllocBuffer(IBufferHandle& handle, int32_t width,
 
   descriptor_info.usage = static_cast<uint64_t>(local_usage);
 
-#ifdef ALLOCATOR_IMAPPER_V4
-  hidl_vec<uint8_t> descriptor;
-  Return<void> ret = hidl_mapper_->createDescriptor(
-    descriptor_info,
-    [&descriptor](const auto &err,const auto &desc) { descriptor = desc; });
-#else
-  hidl_vec<uint32_t> descriptor;
-  Return<void> ret = hidl_mapper_->createDescriptor(
-    descriptor_info,
-    [&descriptor](auto err, auto desc) { descriptor = desc; });
-#endif
+  Return<void> ret = hidl_mapper_->createDescriptor(descriptor_info,
+      [&descriptor](const auto &err,const auto &desc) {
+        descriptor = desc;
+      });
 
   if (!ret.isOk()) {
     CAMERA_ERROR("%s: Create descriptor failed.\n", __func__);
@@ -201,34 +194,22 @@ MemAllocError HidlAllocDevice::MapBuffer(const IBufferHandle& handle,
 
   HidlAllocBuffer *b = static_cast<HidlAllocBuffer *>(handle);
   assert(b != nullptr);
-
   int32_t consumer_usage = HidlAllocUsage().ToLocal(usage);
   auto local_usage = static_cast<uint64_t>(consumer_usage);
   auto buffer = const_cast<native_handle_t*>(b->GetNativeHandle());
 
   hidl_handle fence_handle;
   IMapper::Rect region {start_x, start_y, width, height};
-
   void* data = nullptr;
-#ifdef ALLOCATOR_IMAPPER_V4
   hidl_mapper_->lock(buffer, local_usage, region, fence_handle,
       [&](const auto& error, const auto& data) {
           *vaddr = data;
           if (Error::NONE  != error) {
+            CAMERA_ERROR("%s: Error in MapBuffer, error code: %d", __func__, static_cast<int>(error));
             ret = MemAllocError::kAllocFail;
             *vaddr = nullptr;
           }
       });
-#else
-  hidl_mapper_->lock(buffer, local_usage, region, fence_handle,
-      [&](const auto& error, const auto& data, int32_t bpp, int32_t bps) {
-          *vaddr = data;
-          if (Error::NONE  != error) {
-            ret = MemAllocError::kAllocFail;
-            *vaddr = nullptr;
-          }
-      });
-#endif
 
   return ret;
 }

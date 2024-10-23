@@ -1,4 +1,10 @@
 /*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -143,7 +149,7 @@ CameraTest::CameraTest()
   alloc_device_interface_ = AllocDeviceFactory::CreateAllocDevice();
   assert(nullptr != alloc_device_interface_.get());
 
-  device_client_ = new Camera3DeviceClient(client_cb_);
+  device_client_ = ndk::SharedRefBase::make<Camera3DeviceClient>(client_cb_);
   assert(nullptr != device_client_.get());
 
   auto ret = device_client_->Initialize();
@@ -182,7 +188,7 @@ bool CameraTest::StartCamera(int camera_id, int width, int height, PixelFormat f
   stream_id_ = device_client_->CreateStream(stream_params_);
   assert(stream_id_ == 0);
 
-  preview_request_.streamIds.add(stream_id_);
+  preview_request_.streamIds.push_back(stream_id_);
 
   ret = device_client_->EndConfigure();
   assert(0 == ret);

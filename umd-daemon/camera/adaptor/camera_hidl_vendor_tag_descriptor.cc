@@ -47,6 +47,12 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "camera_hidl_vendor_tag_descriptor.h"
 
 #include "utils/camera_log.h"
@@ -54,8 +60,8 @@
 using namespace android;
 
 status_t CustomVendorTagDescriptor::createDescriptorFromHidl(
-    const hardware::hidl_vec<VendorTagSection>& vts,
-    sp<VendorTagDescriptor>& descriptor) {
+    const std::vector<VendorTagSection>& vts,
+    android::sp<VendorTagDescriptor>& descriptor) {
 
     int tagCount = 0;
 
@@ -68,14 +74,9 @@ status_t CustomVendorTagDescriptor::createDescriptorFromHidl(
         return BAD_VALUE;
     }
 
-    Vector<uint32_t> tagArray;
+    std::vector<uint32_t> tagArray;
 
-    if (tagArray.resize(tagCount) != tagCount) {
-      CAMERA_ERROR("%s: too many (%u) vendor tags defined.", __func__, tagCount);
-      return BAD_VALUE;
-    }
-
-    sp<CustomVendorTagDescriptor> desc = new CustomVendorTagDescriptor();
+    android::sp<CustomVendorTagDescriptor> desc = new CustomVendorTagDescriptor();
     desc->mTagCount = tagCount;
 
     SortedVector<String8> sections;
@@ -98,7 +99,7 @@ status_t CustomVendorTagDescriptor::createDescriptorFromHidl(
                 CAMERA_ERROR("%s: vendor tag %d not in vendor tag section.", __func__, tag);
                 return BAD_VALUE;
             }
-            tagArray.editItemAt(idx++) = section.tags[j].tagId;
+            tagArray[idx++] = section.tags[j].tagId;
 
             const char *tagName = section.tags[j].tagName.c_str();
             if (tagName == NULL) {

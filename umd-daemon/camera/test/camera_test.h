@@ -1,4 +1,10 @@
 /*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
+/*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,7 +58,7 @@ class CameraTest : public RefBase {
   void ResultCb(const CaptureResult &result);
   void StreamCb(StreamBuffer buffer);
 
-  sp<Camera3DeviceClient> device_client_;
+  std::shared_ptr<Camera3DeviceClient> device_client_;
   IAllocDevice* alloc_device_interface_;
 
   CameraClientCallbacks client_cb_;

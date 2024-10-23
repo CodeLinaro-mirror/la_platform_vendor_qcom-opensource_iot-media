@@ -19,11 +19,16 @@
  * limitations under the License.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #ifndef CAMERA3STREAM_H_
 #define CAMERA3STREAM_H_
 
 #include <pthread.h>
-
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/KeyedVector.h>
@@ -34,6 +39,7 @@
 #include "camera_defs.h"
 
 using namespace android;
+using aidl::android::hardware::common::NativeHandle;
 
 namespace camera {
 
@@ -59,11 +65,11 @@ class Camera3Stream {
   int32_t EndPrepare();
   bool IsPrepareActive();
 
-  int32_t GetBuffer(::android::hardware::camera::device::V3_2::StreamBuffer *buffer, int64_t frame_number);
+  int32_t GetBuffer(::aidl::android::hardware::camera::device::StreamBuffer *buffer,int64_t frame_number);
   int32_t ReturnBuffer(const StreamBuffer &buffer);
-  std::unordered_map <int64_t, IBufferHandle> buffers_map;
+  std::map <int64_t, IBufferHandle> buffers_map;
 
-  void ReturnBufferToClient(const ::android::hardware::camera::device::V3_2::StreamBuffer &buffer,
+  void ReturnBufferToClient(const ::aidl::android::hardware::camera::device::StreamBuffer &buffer,
                             int64_t timestamp, int64_t frame_number);
 
   int32_t Close();
@@ -81,7 +87,7 @@ class Camera3Stream {
 
  private:
   int32_t ConfigureLocked();
-  int32_t GetBufferLocked(::android::hardware::camera::device::V3_2::StreamBuffer *buffer = NULL,
+  int32_t GetBufferLocked(::aidl::android::hardware::camera::device::StreamBuffer *buffer = NULL,
       int64_t frame_number = -1);
   int32_t ReturnBufferLocked(const StreamBuffer &buffer);
   uint32_t GetBufferCountLocked() { return total_buffer_count_; }
@@ -118,9 +124,9 @@ class Camera3Stream {
 
   Status status_;
   uint32_t total_buffer_count_;
-  uint32_t pending_buffer_count_;
-  uint32_t hal_buffer_cnt_;
-  uint32_t client_buffer_cnt_;
+  int32_t pending_buffer_count_;
+  int32_t hal_buffer_cnt_;
+  int32_t client_buffer_cnt_;
 
   StreamCallback callbacks_;
   MemAllocFlags old_usage_, client_usage_;

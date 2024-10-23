@@ -62,6 +62,12 @@
  # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
 #include <umd-gadget.h>
@@ -79,13 +85,12 @@
 #include "c2-module.h"
 #endif
 
-typedef std::function<void(uint8_t* data, uint32_t size, uint64_t timestamp)>
-  UmdFrameCallback;
-
 using namespace ::android;
 using namespace ::camera::adaptor;
 using namespace ::camera;
 
+typedef std::function<void(uint8_t* data, uint32_t size, uint64_t timestamp, StreamBuffer &buffer)>
+  UmdFrameCallback;
 enum
 {
   PARTIAL_MWB_MODE_DISABLE = 0,
@@ -242,7 +247,7 @@ private:
   bool mActive;
   bool mOnlyUAC;
 
-  sp<Camera3DeviceClient> mDeviceClient;
+  std::shared_ptr<Camera3DeviceClient> mDeviceClient;
   IAllocDevice* mAllocDeviceInterface;
   CameraMetadata mStaticInfo;
   CameraClientCallbacks mClientCb;
@@ -254,7 +259,7 @@ private:
   std::mutex mCameraMutex;
 
   MessageQ<std::pair<StreamBuffer, int32_t>> mVideoBufferQueue;
-  MessageQ<int32_t> mCodecVideoBufferQueue;
+  MessageQ<std::pair<StreamBuffer, int32_t>> mCodecVideoBufferQueue;
   std::unique_ptr<std::thread> mVideoBufferThread;
   std::unique_ptr<std::thread> mCodecVideoBufferThread;
 

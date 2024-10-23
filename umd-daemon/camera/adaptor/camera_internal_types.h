@@ -19,6 +19,12 @@
  * limitations under the License.
  */
 
+/*
+ * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #ifndef CAMERA3INTERNALTYPES_H_
 #define CAMERA3INTERNALTYPES_H_
 
@@ -47,7 +53,7 @@ typedef struct {
 
 typedef struct CaptureRequest_t {
   CameraMetadata metadata;
-  Vector<Camera3Stream *> streams;
+  std::vector<Camera3Stream *> streams;
   CaptureResultExtras resultExtras;
   Camera3InputStream *input;
 } CaptureRequest;
@@ -62,7 +68,7 @@ struct PendingRequest {
   bool isMetaPresent;
   int buffersRemaining;
   CameraMetadata pendingMetadata;
-  Vector<::android::hardware::camera::device::V3_2::StreamBuffer> pendingBuffers;
+  std::vector<::aidl::android::hardware::camera::device::StreamBuffer> pendingBuffers;
 
   struct PartialResult {
     bool partial3AReceived;
