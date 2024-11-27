@@ -30,7 +30,7 @@
 
 /*
 # Changes from Qualcomm Innovation Center, Inc. are provided under the following license :
-# Copyright(c) 2022-2024 Qualcomm Innovation Center, Inc.
+# Copyright(c) 2022-2025 Qualcomm Innovation Center, Inc.
 #
 # Redistributionand use in sourceand binary forms, with or without
 # modification, are permitted(subject to the limitations in the
@@ -1389,6 +1389,8 @@ bool UmdCamera::CameraStart() {
       break;
     case UMD_VIDEO_FMT_MJPEG:
       params.format = PixelFormat::BLOB;
+      params.data_space = static_cast<DataspaceFlags>(
+        android::hardware::graphics::common::V1_0::Dataspace::V0_JFIF);
       break;
 #ifdef ENABLE_H264
     case UMD_VIDEO_FMT_H264:
