@@ -9,7 +9,7 @@
 #define LOG_TAG "AudioPCM"
 
 const uint32_t UAC_PLAYBACK_SAMPLE_RATE = 48000;
-const uint32_t UAC_CAPTURE_SAMPLE_RATE = 44100;
+const uint32_t UAC_CAPTURE_SAMPLE_RATE = 64000;
 const uint32_t UAC_AUDIO_PERIOD_SIZE = 1024;
 const uint32_t UAC_AUDIO_PERIOD_COUNT = 4;
 const uint32_t UAC_AUDIO_NUM_CHANNELS = 2;
