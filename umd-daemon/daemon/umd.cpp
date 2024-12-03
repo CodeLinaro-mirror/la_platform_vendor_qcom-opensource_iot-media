@@ -12,49 +12,56 @@
 
 #define LOG_TAG "UmdLibAdaptor"
 
-android::sp<UmdCamera> umdcam;
 std::unique_ptr<UmdAudio> audioPlayback;
 std::unique_ptr<UmdAudio> audioCapture;
 std::unique_ptr<UmdUtil> umdUtil;
 std::unique_ptr<std::thread> audioThread;
 
 bool audioActive = false;
-const int32_t CAM_ID = 0;
 const uint32_t SINGLE_GADGET = 1;
-const std::string UVC_DEV = "/dev/video2";
 const std::string HOST_DEV = "hw:1,0";
 std::vector<std::unique_ptr<FakeCamera>> fakecamInstances;
+std::vector<std::unique_ptr<UmdCamera>> umdcamInstances;
 
 void init_uvc() {
   std::string uvc_dev;
-  int32_t cameraID;
   int32_t gadget_cnt;
-  cameraID = Property::Get("persist.vendor.umd.uvc.camid", CAM_ID);
-  uvc_dev = Property::Get("persist.vendor.umd.uvc.dev", UVC_DEV);
-  umdcam = new UmdCamera(uvc_dev, cameraID);
+  uint32_t num_of_cameras;
+  num_of_cameras = Property::Get("persist.vendor.umd.num.cam", 1);
+
+  for (uint32_t i = 0; i < num_of_cameras; i++) {
+    uvc_dev = "/dev/video" + std::to_string(i + 2);
+    umdcamInstances.push_back(std::unique_ptr<UmdCamera>(new UmdCamera(uvc_dev, i)));
+  }
 
   gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0)
     return;
   if (gadget_cnt > SINGLE_GADGET) {
     UMD_LOG_INFO("MultiUVC usecase\n");
-    for (int i = 0; i < gadget_cnt - 1; i++) {
-      uvc_dev = "/dev/video" + std::to_string(i + 3);
+    for (uint32_t i = 0; i < gadget_cnt - num_of_cameras; i++) {
+      uvc_dev = "/dev/video" + std::to_string(num_of_cameras + i + 2);
       fakecamInstances.push_back(std::unique_ptr<FakeCamera>(new FakeCamera(uvc_dev)));
     }
   }
 }
 
 int32_t start_uvc() {
-  int res = umdcam->StartUVC();
-  if (res) {
-    UMD_LOG_ERROR("Start UVC failed\n");
-    deinit_uvc();
-    return -1;
+  int32_t res;
+  for (const auto &ptr : umdcamInstances) {
+    res = ptr->StartUVC();
+    if (res) {
+      UMD_LOG_ERROR("Start UVC failed\n");
+      ptr->StopUVC();
+      deinit_uvc();
+      return -1;
+    }
   }
+
   int32_t gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0) {
-    umdcam->StopUVC();
+    for (const auto &ptr : umdcamInstances)
+      ptr->StopUVC();
     deinit_uvc();
     return -1;
   }
@@ -63,7 +70,8 @@ int32_t start_uvc() {
       res = ptr->Init();
       if (res) {
         UMD_LOG_ERROR("Start MultiUVC failed\n");
-        umdcam->StopUVC();
+        for (const auto &ptr : umdcamInstances)
+          ptr->StopUVC();
         deinit_uvc();
         return -1;
       }
@@ -74,7 +82,8 @@ int32_t start_uvc() {
 }
 
 void stop_uvc() {
-  umdcam->StopUVC();
+  for (const auto &ptr : umdcamInstances)
+    ptr->StopUVC();
   int32_t gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0)
     return;
@@ -86,8 +95,7 @@ void stop_uvc() {
 }
 
 void deinit_uvc() {
-  if (umdcam)
-    umdcam = nullptr;
+  umdcamInstances.clear();
   int32_t gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0)
     return;
