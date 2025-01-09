@@ -65,7 +65,7 @@
 
 /*
  * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -1228,8 +1228,8 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
     usage.flags = IMemAllocUsage::kSwReadOften;
     ret = mAllocDeviceInterface->MapBuffer(
                                      buffer.handle, 0,
-                                     0, buffer.info.plane_info[0].width,
-                                     buffer.info.plane_info[0].height,
+                                     0, 0,
+                                     0,
                                      usage, (void **)&mapped_buffer);
 
     if ((MemAllocError::kAllocOk != ret) || (NULL == mapped_buffer)) {
@@ -1407,6 +1407,8 @@ bool UmdCamera::CameraStart() {
       break;
     case UMD_VIDEO_FMT_MJPEG:
       params.format = PixelFormat::BLOB;
+      params.data_space = static_cast<Dataspace>(
+        android::hardware::graphics::common::V1_0::Dataspace::V0_JFIF);
       break;
 #ifdef ENABLE_H264
     case UMD_VIDEO_FMT_H264:

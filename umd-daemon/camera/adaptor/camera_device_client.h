@@ -21,7 +21,7 @@
 
 /*
  * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -219,7 +219,7 @@ class Camera3DeviceClient : public BnCameraDeviceCallback {
 
   CameraMetadata request_templates_[CAMERA_TEMPLATE_COUNT];
   static const int32_t JPEG_BUFFER_SIZE_MIN =
-      256 * 1024 + 6 /*sizeof(camera3_jpeg_blob)*/;
+      256 * 1024 + 8 /*sizeof(camera3_jpeg_blob)*/;
 
   std::shared_ptr<ICameraProvider> camera_provider_;
   CameraMetadata device_info_;

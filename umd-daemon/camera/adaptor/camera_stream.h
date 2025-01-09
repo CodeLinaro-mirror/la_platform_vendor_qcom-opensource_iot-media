@@ -21,7 +21,7 @@
 
 /*
  * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -124,9 +124,9 @@ class Camera3Stream {
 
   Status status_;
   uint32_t total_buffer_count_;
-  int32_t pending_buffer_count_;
-  int32_t hal_buffer_cnt_;
-  int32_t client_buffer_cnt_;
+  uint32_t pending_buffer_count_;
+  uint32_t hal_buffer_cnt_;
+  uint32_t client_buffer_cnt_;
 
   StreamCallback callbacks_;
   MemAllocFlags old_usage_, client_usage_;

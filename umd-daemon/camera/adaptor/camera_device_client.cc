@@ -21,7 +21,7 @@
 
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -310,7 +310,7 @@ int32_t Camera3DeviceClient::OpenCamera(uint32_t idx) {
                   descriptor;
     ndk::ScopedAStatus resultQueueRet = camera_session_->getCaptureResultMetadataQueue(&descriptor);
     if (!resultQueueRet.isOk()) {
-      CAMERA_INFO("Failed to get Capture Result Metadata Queue for device");
+      CAMERA_ERROR("Failed to get Capture Result Metadata Queue for device");
     }
 
     result_metadata_queue_ = std::make_shared<ResultMetadataQueue>(descriptor);
@@ -840,11 +840,13 @@ int32_t Camera3DeviceClient::CaclulateBlobSize(int32_t width, int32_t height) {
   }
   maxJpegBufferSize = jpegBufMaxSize.data.i32[0];
   assert(JPEG_BUFFER_SIZE_MIN < maxJpegBufferSize);
+  float scaleFactor = static_cast<float>(width * height) /
+    (maxJpegSizeWidth * maxJpegSizeHeight);
 
-  ssize_t jpegBufferSize = width * height;
-  if (jpegBufferSize > maxJpegBufferSize) {
+  size_t jpegBufferSize = static_cast<size_t>(scaleFactor *
+          (maxJpegBufferSize - JPEG_BUFFER_SIZE_MIN) + JPEG_BUFFER_SIZE_MIN);
+  if (jpegBufferSize > maxJpegBufferSize)
     jpegBufferSize = maxJpegBufferSize;
-  }
 
   return jpegBufferSize;
 }
@@ -1052,8 +1054,8 @@ void Camera3DeviceClient::HandleCaptureResult(
   uint32_t frameNumber = result.frameNumber;
   bool isPartialResult = false;
 
-  if (result.result.metadata.size() == 0 && result.outputBuffers.size() == 0) {
-    //SET_ERR("No result data provided by HAL for frame %d", frameNumber);
+  if (result.fmqResultSize == 0 && result.outputBuffers.size() == 0 && result.partialResult == 0) {
+    SET_ERR("No result data provided by HAL for frame %d", frameNumber);
     return;
   }
 
@@ -1065,17 +1067,19 @@ void Camera3DeviceClient::HandleCaptureResult(
         frameNumber, result.partialResult);
     return;
   }
-    if (result.fmqResultSize > 0) {
-        resultMetadata.metadata.resize(result.fmqResultSize);
-        if (nullptr == result_metadata_queue_) {
-            SET_ERR("%s: mResultMetadataQueue is nullptr", __func__);
-            return;
-        }
-        if (!result_metadata_queue_->read(reinterpret_cast<int8_t*>(resultMetadata.metadata.data()), result.fmqResultSize)) {
-            SET_ERR("%s: Read operation failed", __func__);
-            return;
-        }
-    }
+  if (result.fmqResultSize > 0) {
+      resultMetadata.metadata.resize(result.fmqResultSize);
+      if (nullptr == result_metadata_queue_) {
+          SET_ERR("%s: mResultMetadataQueue is nullptr", __func__);
+          return;
+      }
+      if (!result_metadata_queue_->read(reinterpret_cast<int8_t*>
+                (resultMetadata.metadata.data()), result.fmqResultSize)) {
+          SET_ERR("%s: Read operation failed", __func__);
+          return;
+      }
+  }
+
   CameraMetadata collectedPartialResult;
   camera_metadata_ro_entry_t entry;
   uint32_t numBuffersReturned;
