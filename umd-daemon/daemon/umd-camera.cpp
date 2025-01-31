@@ -30,7 +30,7 @@
 
 /*
 # Changes from Qualcomm Innovation Center, Inc. are provided under the following license :
-# Copyright(c) 2022-2024 Qualcomm Innovation Center, Inc.
+# Copyright(c) 2022-2025 Qualcomm Innovation Center, Inc.
 #
 # Redistributionand use in sourceand binary forms, with or without
 # modification, are permitted(subject to the limitations in the
@@ -1680,10 +1680,18 @@ bool UmdCamera::InitializeCodec() {
 
   UmdFrameCallback umdFrameCb = [&](uint8_t* data, uint32_t size, uint64_t
     timestamp, StreamBuffer &buffer) {
-    uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
-        data, size, size, timestamp);
-    PrintFPS();
-    mCodecVideoBufferQueue.push(std::make_pair (buffer, bufidx)); };
+
+    if (mActive) {
+      uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
+          data, size, size, timestamp);
+      PrintFPS();
+      mCodecVideoBufferQueue.push(std::make_pair (buffer, bufidx));
+    } else {
+      mAllocDeviceInterface->UnmapBuffer(buffer.handle);
+      mDeviceClient->ReturnStreamBuffer(buffer);
+    }
+
+  };
 
   std::shared_ptr<IC2Notifier> notifier = std::make_shared<UmdC2Notifier>(
     umdFrameCb);
