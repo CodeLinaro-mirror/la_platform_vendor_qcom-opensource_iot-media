@@ -90,7 +90,7 @@
 
 #define C2_COMPONENT_NAME "c2.qti.avc.encoder"
 #define C2_RATE_CTRL_DISABLE 0x7F000000
-#define C2_BITRATE 0xffffffff
+#define C2_BITRATE 10000000
 #define UMD_VIDEO_CTRL_GET_PAN(X)    (((int32_t *)(&(X)))[0] / 3600)
 #define UMD_VIDEO_CTRL_GET_TILT(X)   (((int32_t *)(&(X)))[1] / 3600)
 #define UMD_VIDEO_CTRL_SET_PAN_AND_TILT(P, T) \
@@ -100,6 +100,7 @@
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
 const uint32_t STREAM_BUFFER_COUNT = 10;
+const uint32_t DCVS_EXTRA_BUFFER_COUNT = 5;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 const uint32_t C2_OUT_FRAMERATE = 30;
 const uint32_t C2_ROTATION_ANGLE = 180;
@@ -1413,6 +1414,7 @@ bool UmdCamera::CameraStart() {
 #ifdef ENABLE_H264
     case UMD_VIDEO_FMT_H264:
       params.format = PixelFormat::IMPLEMENTATION_DEFINED;
+      params.bufferCount += DCVS_EXTRA_BUFFER_COUNT;
       if (!InitializeCodec())
         return false;
       break;
@@ -1754,7 +1756,8 @@ void UmdCamera::SetEncoderParameters() {
 
   // rate control
   C2StreamBitrateModeTuning::output ratectrl;
-  ratectrl.value = static_cast<C2Config::bitrate_mode_t>(C2_RATE_CTRL_DISABLE);
+  ratectrl.value = static_cast<C2Config::bitrate_mode_t>
+      (C2Config::BITRATE_VARIABLE);
   SetParams(C2Param::Copy(ratectrl), C2_PARAMKEY_BITRATE_MODE);
 
   // bitrate
@@ -1779,6 +1782,12 @@ void UmdCamera::SetEncoderParameters() {
   irefresh.mode = C2Config::INTRA_REFRESH_DISABLED;
   irefresh.period = C2_REFRESH_PERIOD;
   SetParams(C2Param::Copy(irefresh), C2_PARAMKEY_INTRA_REFRESH);
+
+  // set realtime session
+  C2RealTimePriorityTuning priority;
+  priority.value = 0;
+  SetParams(C2Param::Copy(priority), C2_PARAMKEY_PRIORITY);
+
 }
 #endif
 
