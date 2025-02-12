@@ -49,7 +49,7 @@
 
 /*
  * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -74,7 +74,7 @@ status_t CustomVendorTagDescriptor::createDescriptorFromHidl(
         return BAD_VALUE;
     }
 
-    std::vector<uint32_t> tagArray;
+    std::vector<uint32_t> tagArray(tagCount);
 
     android::sp<CustomVendorTagDescriptor> desc = new CustomVendorTagDescriptor();
     desc->mTagCount = tagCount;
