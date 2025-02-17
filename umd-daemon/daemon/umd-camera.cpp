@@ -30,7 +30,7 @@
 
 /*
 # Changes from Qualcomm Innovation Center, Inc. are provided under the following license :
-# Copyright(c) 2022-2024 Qualcomm Innovation Center, Inc.
+# Copyright(c) 2022-2025 Qualcomm Innovation Center, Inc.
 #
 # Redistributionand use in sourceand binary forms, with or without
 # modification, are permitted(subject to the limitations in the
@@ -64,8 +64,8 @@
 */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -90,7 +90,7 @@
 
 #define C2_COMPONENT_NAME "c2.qti.avc.encoder"
 #define C2_RATE_CTRL_DISABLE 0x7F000000
-#define C2_BITRATE 0xffffffff
+#define C2_BITRATE 10000000
 #define UMD_VIDEO_CTRL_GET_PAN(X)    (((int32_t *)(&(X)))[0] / 3600)
 #define UMD_VIDEO_CTRL_GET_TILT(X)   (((int32_t *)(&(X)))[1] / 3600)
 #define UMD_VIDEO_CTRL_SET_PAN_AND_TILT(P, T) \
@@ -100,6 +100,7 @@
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
 const uint32_t STREAM_BUFFER_COUNT = 10;
+const uint32_t DCVS_EXTRA_BUFFER_COUNT = 5;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 const uint32_t C2_OUT_FRAMERATE = 30;
 const uint32_t C2_ROTATION_ANGLE = 180;
@@ -1228,8 +1229,8 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
     usage.flags = IMemAllocUsage::kSwReadOften;
     ret = mAllocDeviceInterface->MapBuffer(
                                      buffer.handle, 0,
-                                     0, buffer.info.plane_info[0].width,
-                                     buffer.info.plane_info[0].height,
+                                     0, 0,
+                                     0,
                                      usage, (void **)&mapped_buffer);
 
     if ((MemAllocError::kAllocOk != ret) || (NULL == mapped_buffer)) {
@@ -1407,10 +1408,13 @@ bool UmdCamera::CameraStart() {
       break;
     case UMD_VIDEO_FMT_MJPEG:
       params.format = PixelFormat::BLOB;
+      params.data_space = static_cast<Dataspace>(
+        android::hardware::graphics::common::V1_0::Dataspace::V0_JFIF);
       break;
 #ifdef ENABLE_H264
     case UMD_VIDEO_FMT_H264:
       params.format = PixelFormat::IMPLEMENTATION_DEFINED;
+      params.bufferCount += DCVS_EXTRA_BUFFER_COUNT;
       if (!InitializeCodec())
         return false;
       break;
@@ -1678,10 +1682,18 @@ bool UmdCamera::InitializeCodec() {
 
   UmdFrameCallback umdFrameCb = [&](uint8_t* data, uint32_t size, uint64_t
     timestamp, StreamBuffer &buffer) {
-    uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
-        data, size, size, timestamp);
-    PrintFPS();
-    mCodecVideoBufferQueue.push(std::make_pair (buffer, bufidx)); };
+
+    if (mActive) {
+      uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
+          data, size, size, timestamp);
+      PrintFPS();
+      mCodecVideoBufferQueue.push(std::make_pair (buffer, bufidx));
+    } else {
+      mAllocDeviceInterface->UnmapBuffer(buffer.handle);
+      mDeviceClient->ReturnStreamBuffer(buffer);
+    }
+
+  };
 
   std::shared_ptr<IC2Notifier> notifier = std::make_shared<UmdC2Notifier>(
     umdFrameCb);
@@ -1744,7 +1756,8 @@ void UmdCamera::SetEncoderParameters() {
 
   // rate control
   C2StreamBitrateModeTuning::output ratectrl;
-  ratectrl.value = static_cast<C2Config::bitrate_mode_t>(C2_RATE_CTRL_DISABLE);
+  ratectrl.value = static_cast<C2Config::bitrate_mode_t>
+      (C2Config::BITRATE_VARIABLE);
   SetParams(C2Param::Copy(ratectrl), C2_PARAMKEY_BITRATE_MODE);
 
   // bitrate
@@ -1769,6 +1782,12 @@ void UmdCamera::SetEncoderParameters() {
   irefresh.mode = C2Config::INTRA_REFRESH_DISABLED;
   irefresh.period = C2_REFRESH_PERIOD;
   SetParams(C2Param::Copy(irefresh), C2_PARAMKEY_INTRA_REFRESH);
+
+  // set realtime session
+  C2RealTimePriorityTuning priority;
+  priority.value = 0;
+  SetParams(C2Param::Copy(priority), C2_PARAMKEY_PRIORITY);
+
 }
 #endif
 

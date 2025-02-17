@@ -31,26 +31,23 @@ LOCAL_SHARED_LIBRARIES := \
     libhwbinder \
     libui \
     libbinder \
-    libcamera_metadata \
     libutils \
     libcutils \
     libfmq \
     liblog \
     libc++ \
-    libcamera_utils \
-    libcamera_memory_interface \
-    camx.provider-impl \
-    camx.device-impl \
+    libhidlmemory \
+    libgralloctypes \
+    libcamera_metadata \
     android.hardware.camera.provider-V1-ndk \
     android.hardware.camera.common@1.0 \
+    android.hardware.camera.device-V1-ndk \
+    android.hardware.camera.metadata-V1-ndk \
     android.hardware.graphics.common@1.0 \
     android.hardware.graphics.allocator@4.0 \
     android.hardware.graphics.mapper@4.0 \
-    android.hardware.camera.device-V1-ndk \
-    android.hardware.camera.metadata-V1-ndk \
-    android.hidl.allocator@1.0 \
-    libhidlmemory \
-    libgralloctypes
+    libcamera_utils \
+    libcamera_memory_interface
 
 LOCAL_STATIC_LIBRARIES := \
     android.hardware.camera.common@1.0-helper \

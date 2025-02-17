@@ -28,8 +28,8 @@
  */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -191,11 +191,11 @@ MemAllocError HidlAllocDevice::MapBuffer(const IBufferHandle& handle,
                                        int32_t width, int32_t height,
                                        MemAllocFlags usage, void **vaddr) {
   MemAllocError ret = MemAllocError::kAllocOk;
+  std::string errorMessage;
 
   HidlAllocBuffer *b = static_cast<HidlAllocBuffer *>(handle);
   assert(b != nullptr);
-  int32_t consumer_usage = HidlAllocUsage().ToLocal(usage);
-  auto local_usage = static_cast<uint64_t>(consumer_usage);
+  int64_t local_usage = HidlAllocUsage().ToLocal(usage);
   auto buffer = const_cast<native_handle_t*>(b->GetNativeHandle());
 
   hidl_handle fence_handle;
@@ -206,8 +206,24 @@ MemAllocError HidlAllocDevice::MapBuffer(const IBufferHandle& handle,
           *vaddr = data;
           if (Error::NONE  != error) {
             CAMERA_ERROR("%s: Error in MapBuffer, error code: %d", __func__, static_cast<int>(error));
-            ret = MemAllocError::kAllocFail;
-            *vaddr = nullptr;
+            switch (error){
+              case Error::BAD_BUFFER:
+                errorMessage = "BAD_BUFFER: The buffer is invalid or incompatible.";
+                break;
+              case Error::BAD_VALUE:
+                errorMessage = "BAD_VALUE: Invalid cpuUsage or accessRegion.";
+                break;
+              case Error::NO_RESOURCES:
+                errorMessage = "NO_RESOURCES: The buffer cannot be locked at this time.";
+                break;
+              default:
+                errorMessage = "UNKNOWN_ERROR: An unknown error occurred.";
+                break;
+            }
+          CAMERA_ERROR("%s: Error in MapBuffer, error code: %d and error type %s",
+                   __func__, static_cast<int>(error),errorMessage.c_str());
+          ret = MemAllocError::kAllocFail;
+          *vaddr = nullptr;
           }
       });
 
