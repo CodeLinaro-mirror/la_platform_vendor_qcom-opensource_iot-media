@@ -64,7 +64,7 @@
 
 /*
  * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -91,6 +91,8 @@ using namespace ::camera;
 
 typedef std::function<void(uint8_t* data, uint32_t size, uint64_t timestamp, StreamBuffer &buffer)>
   UmdFrameCallback;
+typedef std::function<void(uint64_t frameNumber)>UmdFrameDropCallback;
+
 enum
 {
   PARTIAL_MWB_MODE_DISABLE = 0,
@@ -244,7 +246,7 @@ private:
 
   int mCameraId;
   int mStreamId;
-  bool mActive;
+  std::atomic<bool> mActive;
   bool mOnlyUAC;
 
   std::shared_ptr<Camera3DeviceClient> mDeviceClient;
@@ -271,3 +273,32 @@ private:
   int64_t mCount;
 };
 
+class UmdBufferMap {
+private:
+  std::map<int32_t, StreamBuffer> bufferMap;
+  std::mutex mapMutex;
+
+public:
+  void insert(uint64_t key, StreamBuffer buffer) {
+    std::lock_guard<std::mutex> guard(mapMutex);
+    bufferMap[key] = buffer;
+  }
+
+  void erase(uint64_t key) {
+    std::lock_guard<std::mutex> guard(mapMutex);
+    auto it = bufferMap.find(key);
+    if (it != bufferMap.end()) {
+      bufferMap.erase(it);
+    }
+  }
+
+  StreamBuffer& find(int key) {
+    StreamBuffer buffer;
+    std::lock_guard<std::mutex> guard(mapMutex);
+    auto it = bufferMap.find(key);
+    if (it != bufferMap.end()) {
+      return it->second;
+    }
+    return buffer;
+  }
+};

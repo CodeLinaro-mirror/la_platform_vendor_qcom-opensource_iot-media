@@ -110,18 +110,23 @@ const uint32_t C2_REFRESH_PERIOD = 0;
 const uint64_t FPS_TIME_INTERVAL = 3000000;
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
 uint32_t umd_latency_log;
-std::map<int32_t, StreamBuffer> bufferMap;
+std::unique_ptr<UmdBufferMap> buffMap;
 
 #ifdef ENABLE_H264
 class UmdC2Notifier : public IC2Notifier {
  public:
-  UmdC2Notifier(UmdFrameCallback frameCb) : mFrameCb(frameCb) {}
+  UmdC2Notifier(UmdFrameCallback frameCb, UmdFrameDropCallback frameDropCb) : mFrameCb(frameCb),
+     mFrameDropCb(frameDropCb) {}
   void EventHandler(C2EventType event, void* payload) override {
     switch (event) {
       case C2EventType::kError:
         UMD_LOG_ERROR ("Received engine error\n");
         break;
       case C2EventType::kEOS:
+        break;
+      case C2EventType::kDrop:
+        UMD_LOG_INFO ("Drop event received\n");
+        mFrameDropCb(*static_cast<uint64_t*>(payload));
         break;
       default:
         UMD_LOG_ERROR ("Unknown event '%u'!", static_cast<uint32_t>(event));
@@ -134,16 +139,13 @@ class UmdC2Notifier : public IC2Notifier {
 
     const C2ConstLinearBlock block = c2buffer->data().linearBlocks().front();
     const C2ReadView view = block.map().get();
-    auto it = bufferMap.find(index);
-    if (it != bufferMap.end()) {
-      //remove from map
-      mFrameCb((uint8_t*)view.data(), block.size(), timestamp, it->second);
-      bufferMap.erase(it);
-    }
+    mFrameCb((uint8_t*)view.data(), block.size(), timestamp, buffMap->find(index));
+    buffMap->erase(index);
   }
 
  private:
   UmdFrameCallback mFrameCb;
+  UmdFrameDropCallback mFrameDropCb;
 };
 
 std::shared_ptr<C2Buffer> UmdCamera::ImportGraphicBuffer(StreamBuffer buffer) {
@@ -1256,7 +1258,7 @@ void UmdCamera::StreamCb(StreamBuffer buffer) {
         std::list<std::unique_ptr<C2Param>> settings;
 
         c2buffer = ImportGraphicBuffer(buffer);
-        bufferMap.insert(std::make_pair(index, buffer));
+        buffMap->insert(index, buffer);
         if (c2buffer == nullptr)
           UMD_LOG_ERROR ("Failed to create c2buffer\n");
         else
@@ -1679,6 +1681,7 @@ bool UmdCamera::InitializeCodec() {
     UMD_LOG_ERROR ("Failed to create c2module\n");
     return false;
   }
+  buffMap = std::make_unique<UmdBufferMap>();
 
   UmdFrameCallback umdFrameCb = [&](uint8_t* data, uint32_t size, uint64_t
     timestamp, StreamBuffer &buffer) {
@@ -1692,11 +1695,17 @@ bool UmdCamera::InitializeCodec() {
       mAllocDeviceInterface->UnmapBuffer(buffer.handle);
       mDeviceClient->ReturnStreamBuffer(buffer);
     }
+  };
 
+  UmdFrameDropCallback umdFrameDropCb = [&](uint64_t frameNum) {
+    StreamBuffer& buffer = buffMap->find(frameNum);
+    buffMap->erase(frameNum);
+    mAllocDeviceInterface->UnmapBuffer(buffer.handle);
+    mDeviceClient->ReturnStreamBuffer(buffer);
   };
 
   std::shared_ptr<IC2Notifier> notifier = std::make_shared<UmdC2Notifier>(
-    umdFrameCb);
+    umdFrameCb,umdFrameDropCb);
   mC2Module->Initialize(notifier);
 
   // Set the encoder parameters
