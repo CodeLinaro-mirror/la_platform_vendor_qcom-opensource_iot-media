@@ -21,7 +21,7 @@
 
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -867,10 +867,13 @@ int32_t Camera3DeviceClient::CaclulateBlobSize(int32_t width, int32_t height) {
   maxJpegBufferSize = jpegBufMaxSize.data.i32[0];
   assert(JPEG_BUFFER_SIZE_MIN < maxJpegBufferSize);
 
-  ssize_t jpegBufferSize = width * height;
-  if (jpegBufferSize > maxJpegBufferSize) {
+  float scaleFactor = static_cast<float>(width * height) / (maxJpegSizeWidth *
+    maxJpegSizeHeight);
+
+  size_t jpegBufferSize = static_cast<size_t>(
+    scaleFactor * (maxJpegBufferSize - JPEG_BUFFER_SIZE_MIN) + JPEG_BUFFER_SIZE_MIN);
+  if (jpegBufferSize > maxJpegBufferSize)
     jpegBufferSize = maxJpegBufferSize;
-  }
 
   return jpegBufferSize;
 }
