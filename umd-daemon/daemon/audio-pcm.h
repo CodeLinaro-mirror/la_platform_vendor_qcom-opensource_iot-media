@@ -22,7 +22,11 @@ public:
   struct pcm *Open();
   void Close();
   int Read(AudioBuffer *buffer);
+#ifndef USE_PCM_WRITE
   int Write(AudioBuffer *buffer);
+#else
+  int Write(uint8_t* data, int32_t size);
+#endif
   int IsReady();
   size_t GetBufferSize();
   int GetTimeStamp(unsigned int *avail, struct timespec *ts);

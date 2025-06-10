@@ -159,9 +159,13 @@ void AudioStream::StreamLoopHandler() {
             mCallback(data);
           }
         } else {
+#ifndef USE_PCM_WRITE
           if (mPcmNode->Write(msg.buffer) < 0) {
             UMD_LOG_ERROR("Failed to write buffer! \n");
           }
+#else
+          UMD_LOG_INFO("PCM Write in UMDAudio class");
+#endif
         }
         mMutex.lock();
         if (mBuffersMap.find(msg.buffer) != mBuffersMap.end()) {
