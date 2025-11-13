@@ -20,8 +20,8 @@
  */
 
 /*
- * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -297,7 +297,7 @@ int32_t Camera3DeviceClient::OpenCamera(uint32_t idx) {
     ::aidl::android::hardware::camera::device::CameraMetadata cameraCharacteristics;
     ret_ = camera_device_->getCameraCharacteristics(&cameraCharacteristics);
     if (!ret_.isOk()) {
-      CAMERA_INFO("%s :Failed to get camera characteristics for device",__func__);
+      CAMERA_INFO("%s :Failed to get camera characteristics for device", __func__);
     }
     auto camera_metadata = reinterpret_cast<camera_metadata_t*>(cameraCharacteristics.metadata.data());
     device_info_.clear();
@@ -713,6 +713,17 @@ int32_t Camera3DeviceClient::CreateStream(
     goto exit;
   }
 
+  {
+    ::aidl::android::hardware::camera::device::CameraMetadata cameraCharacteristics;
+    ret_ = camera_device_->getCameraCharacteristics(&cameraCharacteristics);
+    if (!ret_.isOk()) {
+      CAMERA_INFO("%s :Failed to get camera characteristics for device",__func__);
+    }
+    auto camera_metadata = reinterpret_cast<camera_metadata_t*>(cameraCharacteristics.metadata.data());
+    device_info_.clear();
+    device_info_.append(camera_metadata);
+  }
+
   switch (state_) {
     case STATE_ERROR:
       CAMERA_ERROR("%s: Device has encountered a serious error\n", __func__);
@@ -1047,12 +1058,22 @@ exit:
   pthread_mutex_unlock(&lock_);
   return res;
 }
+
+int32_t Camera3DeviceClient::getNumRoi(uint32_t *roi_count){
+  *roi_count = roi_count_;
+  return 0;
+}
+
 void Camera3DeviceClient::HandleCaptureResult(
     const ::aidl::android::hardware::camera::device::CaptureResult &result) {
   int32_t res;
   ::aidl::android::hardware::camera::device::CameraMetadata resultMetadata;
   uint32_t frameNumber = result.frameNumber;
   bool isPartialResult = false;
+  uint32_t roi_cnt = 0;
+  uint32_t tag = 0;
+  const char * name = "OEMFDResults";
+  const char * section = "org.quic.camera2.oemfdresults";
 
   if (result.fmqResultSize == 0 && result.outputBuffers.size() == 0 && result.partialResult == 0) {
     SET_ERR("No result data provided by HAL for frame %d", frameNumber);
@@ -1079,6 +1100,23 @@ void Camera3DeviceClient::HandleCaptureResult(
           SET_ERR("%s: Read operation failed", __func__);
           return;
       }
+  }
+
+  if (resultMetadata.metadata.data()) {
+    auto result_metadata = reinterpret_cast<camera_metadata_t*>(resultMetadata.metadata.data());
+    auto status = vendor_tag_desc_->lookupTag(android::String8(name),android::String8(section), &tag);
+    if (status != 0) {
+      CAMERA_DEBUG ("Unable to find vendor tag for '%s', section '%s'!\n", name, section);
+    }
+    device_info_.clear();
+    device_info_.append(result_metadata);
+    camera_metadata_entry entry_count = device_info_.find(tag);
+    if (entry_count.count > 0) {
+      const FaceROIInformation *faceROIInfo =
+          reinterpret_cast<const FaceROIInformation *>(entry_count.data.i32);
+      roi_cnt = faceROIInfo->ROICount;
+    }
+    roi_count_ = roi_cnt;
   }
 
   CameraMetadata collectedPartialResult;

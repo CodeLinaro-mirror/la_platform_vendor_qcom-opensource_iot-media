@@ -20,8 +20,8 @@
  */
 
 /*
- * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -60,6 +60,7 @@
 #include <fmq/AidlMessageQueue.h>
 
 #define CAMERA_TEMPLATE_COUNT 10
+static const uint32_t  MaxFaceROIs     = 10;
 
 using namespace android;
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
@@ -107,6 +108,7 @@ class Camera3DeviceClient : public BnCameraDeviceCallback {
   int32_t GetNumberOfCameras() { return number_of_cameras_; }
   const std::vector<int32_t> GetRequestIds(){ return current_request_ids_; }
   int32_t WaitUntilIdle();
+  int32_t getNumRoi(uint32_t* roi_count);
 
   int32_t Flush(int64_t *lastFrameNumber = NULL);
   int32_t Prepare(int streamId);
@@ -198,6 +200,36 @@ class Camera3DeviceClient : public BnCameraDeviceCallback {
 
   StreamConfigurationMode GetOpMode();
 
+  typedef struct {
+    uint32_t left;
+    uint32_t top;
+    uint32_t width;
+    uint32_t height;
+  } RectangleCoordinate;
+
+  typedef struct {
+    uint32_t id;
+    uint32_t confidence;
+    RectangleCoordinate maskRect;
+  } MaskROIData;
+
+  typedef struct {
+    uint32_t x;
+    uint32_t y;
+  } FaceLandmarkData;
+
+  typedef struct {
+    uint64_t requestId;
+    uint64_t frameNumber;
+    uint64_t ROICount;
+    RectangleCoordinate unstabilizedROI[MaxFaceROIs];
+    RectangleCoordinate stabilizedROI[MaxFaceROIs];
+    bool maskValid[MaxFaceROIs];
+    MaskROIData unstabilizedMaskROI[MaxFaceROIs];
+    MaskROIData stabilizedMaskROI[MaxFaceROIs];
+    FaceLandmarkData faceLandmark[MaxFaceROIs];
+  } FaceROIInformation;
+
   pthread_mutex_t pending_requests_lock_;
   PendingRequestVector pending_requests_vector_;
   PendingRequestVector pending_error_requests_vector_;
@@ -207,6 +239,7 @@ class Camera3DeviceClient : public BnCameraDeviceCallback {
 
   String8 last_error_;
   uint32_t id_;
+  uint32_t roi_count_;
 
   State state_;
   bool flush_on_going_;

@@ -1,7 +1,9 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+
 #include<regex>
 
 #include "umd.h"
@@ -20,29 +22,15 @@ std::unique_ptr<std::thread> audioThread;
 
 bool audioActive = false;
 const int32_t CAM_ID = 0;
-const uint32_t SINGLE_GADGET = 1;
 const std::string UVC_DEV = "/dev/video2";
 const std::string HOST_DEV = "hw:1,0";
-std::vector<std::unique_ptr<FakeCamera>> fakecamInstances;
 
 void init_uvc() {
   std::string uvc_dev;
   int32_t cameraID;
-  int32_t gadget_cnt;
   cameraID = Property::Get("persist.vendor.umd.uvc.camid", CAM_ID);
   uvc_dev = Property::Get("persist.vendor.umd.uvc.dev", UVC_DEV);
   umdcam = new UmdCamera(uvc_dev, cameraID);
-
-  gadget_cnt = get_gadget_cnt();
-  if (gadget_cnt < 0)
-    return;
-  if (gadget_cnt > SINGLE_GADGET) {
-    UMD_LOG_INFO("MultiUVC usecase\n");
-    for (int i = 0; i < gadget_cnt - 1; i++) {
-      uvc_dev = "/dev/video" + std::to_string(i + 3);
-      fakecamInstances.push_back(std::unique_ptr<FakeCamera>(new FakeCamera(uvc_dev)));
-    }
-  }
 }
 
 int32_t start_uvc() {
@@ -52,47 +40,17 @@ int32_t start_uvc() {
     deinit_uvc();
     return -1;
   }
-  int32_t gadget_cnt = get_gadget_cnt();
-  if (gadget_cnt < 0) {
-    umdcam->StopUVC();
-    deinit_uvc();
-    return -1;
-  }
-  if (gadget_cnt > SINGLE_GADGET) {
-    for (const auto &ptr : fakecamInstances) {
-      res = ptr->Init();
-      if (res) {
-        UMD_LOG_ERROR("Start MultiUVC failed\n");
-        umdcam->StopUVC();
-        deinit_uvc();
-        return -1;
-      }
-    }
-  }
 
   return 0;
 }
 
 void stop_uvc() {
   umdcam->StopUVC();
-  int32_t gadget_cnt = get_gadget_cnt();
-  if (gadget_cnt < 0)
-    return;
-  if (gadget_cnt > SINGLE_GADGET) {
-    for (const auto &ptr : fakecamInstances) {
-      ptr->Deinit();
-    }
-  }
 }
 
 void deinit_uvc() {
   if (umdcam)
     umdcam = nullptr;
-  int32_t gadget_cnt = get_gadget_cnt();
-  if (gadget_cnt < 0)
-    return;
-  if (gadget_cnt > SINGLE_GADGET)
-    fakecamInstances.clear();
 }
 
 void deinit_uac() {
@@ -197,23 +155,4 @@ int32_t uevent_monitor(EventCallback uevent_cb) {
     }
   }
   return 0;
-}
-
-int32_t get_gadget_cnt() {
-  std::string usb_mode;
-  std::smatch match;
-  int32_t count = 0;
-  std::ifstream file("/config/usb_gadget/g1/configs/b.1/strings/0x409/configuration");
-  if (!file.is_open()) {
-    UMD_LOG_ERROR("Failed to open usb composition file");
-    return -1;
-  }
-  std::getline(file, usb_mode);
-  file.close();
-  std::regex pattern("(\\d+)(?=xuvc)");
-
-  if (std::regex_search(usb_mode, match, pattern))
-    count = std::stoi(match.str());
-
-  return count;
 }
