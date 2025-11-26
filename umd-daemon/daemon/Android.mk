@@ -20,7 +20,8 @@ LOCAL_SRC_FILES := umd-camera.cpp \
                    audio-pcm.cpp \
                    umd.cpp \
                    umd-audio.cpp \
-                   umd-util.cpp
+                   umd-util.cpp \
+                   umd-video-data-processing.cpp
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 

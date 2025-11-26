@@ -64,8 +64,8 @@
 */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * ​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -74,13 +74,8 @@
 
 #include <VendorTagDescriptor.h>
 #include <hardware/camera3.h>
-
-#ifdef ENABLE_H264
-#include <C2PlatformSupport.h>
-#include <C2AllocatorGralloc.h>
-#include <C2BlockInternal.h>
-#include <gralloc_priv.h>
-#endif
+#include <fstream>
+#include <regex>
 
 #define LOG_TAG "UmdCamera"
 
@@ -99,7 +94,7 @@
 
 using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
 
-const uint32_t STREAM_BUFFER_COUNT = 10;
+const uint32_t STREAM_BUFFER_COUNT = 15;
 const uint32_t DCVS_EXTRA_BUFFER_COUNT = 5;
 const uint32_t VIDEO_BUFFER_TIMEOUT = 1000; // [ms]
 const uint32_t C2_OUT_FRAMERATE = 30;
@@ -109,104 +104,10 @@ const uint32_t C2_BFRAME_VALUE = 0;
 const uint32_t C2_REFRESH_PERIOD = 0;
 const uint64_t FPS_TIME_INTERVAL = 3000000;
 uint64_t UmdCamera::umd_current_pan_and_tilt = 0;
+uint32_t UmdCamera::mGadgetItr = 0;
+bool UmdCamera::mCamStartDone = false;
+bool UmdCamera::mCamStopDone = false;
 uint32_t umd_latency_log;
-std::unique_ptr<UmdBufferMap> buffMap;
-
-#ifdef ENABLE_H264
-class UmdC2Notifier : public IC2Notifier {
- public:
-  UmdC2Notifier(UmdFrameCallback frameCb, UmdFrameDropCallback frameDropCb) : mFrameCb(frameCb),
-     mFrameDropCb(frameDropCb) {}
-  void EventHandler(C2EventType event, void* payload) override {
-    switch (event) {
-      case C2EventType::kError:
-        UMD_LOG_ERROR ("Received engine error\n");
-        break;
-      case C2EventType::kEOS:
-        break;
-      case C2EventType::kDrop:
-        UMD_LOG_INFO ("Drop event received\n");
-        mFrameDropCb(*static_cast<uint64_t*>(payload));
-        break;
-      default:
-        UMD_LOG_ERROR ("Unknown event '%u'!", static_cast<uint32_t>(event));
-        break;
-    }
-  }
-
-  void FrameAvailable(std::shared_ptr<C2Buffer>& c2buffer, uint64_t index,
-                      uint64_t timestamp, C2FrameData::flags_t flags) override {
-
-    const C2ConstLinearBlock block = c2buffer->data().linearBlocks().front();
-    const C2ReadView view = block.map().get();
-    mFrameCb((uint8_t*)view.data(), block.size(), timestamp, buffMap->find(index));
-    buffMap->erase(index);
-  }
-
- private:
-  UmdFrameCallback mFrameCb;
-  UmdFrameDropCallback mFrameDropCb;
-};
-
-std::shared_ptr<C2Buffer> UmdCamera::ImportGraphicBuffer(StreamBuffer buffer) {
-  uint64_t format = HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS;
-  std::unique_ptr<private_handle_t> privateHandle;
-  uint32_t height = buffer.info.plane_info[0].height;
-  uint32_t width = buffer.info.plane_info[0].width;
-  uint32_t stride = buffer.info.plane_info[0].stride;
-  uint64_t usage = GRALLOC_USAGE_SW_WRITE_OFTEN |
-                   GRALLOC_USAGE_SW_READ_OFTEN;
-
-  const private_handle_t* priv_handle =
-      static_cast<const private_handle_t*>(GetAllocBufferHandle(buffer.handle));
-  if (priv_handle == NULL) {
-    UMD_LOG_ERROR ("Failed to create private_handle_t");
-    return nullptr;
-  }
-
-  C2Handle* handle = android::WrapNativeCodec2GrallocHandle(
-      (native_handle_t*)priv_handle, width, height, format, usage, stride);
-  if (handle == nullptr) {
-    UMD_LOG_ERROR ("Failed to create C2 handle");
-    return nullptr;
-  }
-
-  std::shared_ptr<C2Allocator> allocator;
-  std::shared_ptr<C2AllocatorStore> store =
-      android::GetCodec2PlatformAllocatorStore();
-  auto ret = store->fetchAllocator(
-      android::C2PlatformAllocatorStore::DEFAULT_GRAPHIC, &allocator);
-  if (ret != C2_OK || allocator == nullptr) {
-    UMD_LOG_ERROR ("Failed to create C2 allocator");
-    delete handle;
-    return nullptr;
-  }
-
-  std::shared_ptr<C2GraphicAllocation> allocation;
-  ret = allocator->priorGraphicAllocation(handle, &allocation);
-  if (ret != C2_OK) {
-    UMD_LOG_ERROR ("Prior Graphic allocation failed");
-    delete handle;
-    return nullptr;
-  }
-
-  std::shared_ptr<C2GraphicBlock> block =
-      _C2BlockFactory::CreateGraphicBlock(allocation);
-  if (!block) {
-    UMD_LOG_ERROR ("Failed to create graphic block!");
-    return nullptr;
-  }
-
-  auto c2buffer = C2Buffer::CreateGraphicBuffer(
-      block->share(C2Rect(block->width(), block->height()), ::C2Fence()));
-  if (!c2buffer) {
-    UMD_LOG_ERROR ("Failed to create graphic C2 buffer!");
-    return nullptr;
-  }
-
-  return c2buffer;
-}
-#endif
 
 UmdCamera::UmdCamera(std::string uvcdev,int cameraId)
   : mGadget(nullptr),
@@ -222,11 +123,8 @@ UmdCamera::UmdCamera(std::string uvcdev,int cameraId)
     mActive(false),
     mRequestId(-1),
     mDeviceClient(nullptr),
-    mAllocDeviceInterface(nullptr),
     mClientCb({}),
     mLastFrameNumber(-1),
-    mVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
-    mCodecVideoBufferQueue(VIDEO_BUFFER_TIMEOUT),
     mCtrlValues({}),
     mRotation(StreamRotation::ROTATION_0) {
   GET_LATENCY_LOGS();
@@ -236,6 +134,7 @@ UmdCamera::~UmdCamera() {}
 
 int32_t UmdCamera::StartUVC() {
   int32_t res = -1;
+  std::string uvc_dev;
   if (!mUvcDev.empty()) {
     res = InitializeCamera();
     if (res != 0) {
@@ -244,11 +143,16 @@ int32_t UmdCamera::StartUVC() {
     }
   }
 
-  mGadget = umd_gadget_new(mUvcDev.empty() ? nullptr : mUvcDev.c_str(),
+  mGadgetCount = GetGadgetCount();
+  for (int32_t i = 0; i < mGadgetCount; i++) {
+    uvc_dev = "/dev/video" + std::to_string(i + 2);
+    mGadget = umd_gadget_new(uvc_dev.c_str(),
       &mUmdVideoCallbacks, this);
-  if (nullptr == mGadget) {
-    UMD_LOG_ERROR ("Failed to create UMD gadget!\n");
-    return -ENODEV;
+    if (nullptr == mGadget) {
+      UMD_LOG_ERROR("Failed to create UMD gadget!\n");
+      return -ENODEV;
+    }
+    mGadgets.push_back(mGadget);
   }
 
   mCameraThread = std::unique_ptr<std::thread>(
@@ -269,12 +173,11 @@ void UmdCamera::StopUVC() {
     mCameraThread->join();
   }
 
-  if (mGadget != nullptr)
-    umd_gadget_free (mGadget);
-
-  if (nullptr != mAllocDeviceInterface) {
-    AllocDeviceFactory::DestroyAllocDevice(mAllocDeviceInterface);
+  for (int i = 0; i < mGadgets.size(); i++) {
+    if (mGadgets[i] != nullptr)
+      umd_gadget_free(mGadget);
   }
+  mGadgets.clear();
 }
 
 int32_t UmdCamera::InitializeCamera() {
@@ -291,12 +194,6 @@ int32_t UmdCamera::InitializeCamera() {
     int64_t ts) { ShutterCb(extras, ts); };
 
   mClientCb.resultCb = [&](const CaptureResult& result) { ResultCb(result); };
-
-  mAllocDeviceInterface = AllocDeviceFactory::CreateAllocDevice();
-  if (nullptr == mAllocDeviceInterface) {
-    UMD_LOG_ERROR("Alloc device creation failed!\n");
-    return -ENODEV;
-  }
 
   mDeviceClient = ndk::SharedRefBase::make<Camera3DeviceClient>(mClientCb);
   if (nullptr == mDeviceClient.get()) {
@@ -1214,79 +1111,37 @@ void UmdCamera::PreparedCb(int stream_id) {
 }
 
 void UmdCamera::ResultCb(const CaptureResult &result) {
-  UMD_LOG_DEBUG("%s: Result requestId: %d partial count: %d\n", __func__,
-      result.resultExtras.requestId, result.resultExtras.partialResultCount);
+  return;
 }
 
 void UmdCamera::StreamCb(StreamBuffer buffer) {
-  int maxsize = 0;
-  int size = 0;
-  uint8_t *mapped_buffer = nullptr;
-  MemAllocFlags usage;
-  MemAllocError ret;
+  int32_t res;
+  uint32_t roi_cnt;
 
-  UMD_LATENCY_LOG("UmdCamera-latency: FrameNumber: %d Buffer from HAL\n",
-      buffer.frame_number);
-  if (mActive) {
-    usage.flags = IMemAllocUsage::kSwReadOften;
-    ret = mAllocDeviceInterface->MapBuffer(
-                                     buffer.handle, 0,
-                                     0, 0,
-                                     0,
-                                     usage, (void **)&mapped_buffer);
+  mDeviceClient->getNumRoi(&roi_cnt);
 
-    if ((MemAllocError::kAllocOk != ret) || (NULL == mapped_buffer)) {
-      UMD_LOG_ERROR("%s: Unable to map buffer: %p res: %d\n", __func__,
-          mapped_buffer, ret);
-      goto fail_return;
+  if (roi_cnt > 1 && roi_cnt < 8) {
+    while (mRequest.streamIds.size() < roi_cnt) {
+      mRequest.streamIds.push_back(mCameraStreams[++mStreamIdx]);
     }
 
-    switch (buffer.info.format) {
-      case BufferFormat::kBLOB:
-        maxsize = buffer.info.plane_info[0].size;
-        size = GetBlobSize(mapped_buffer, buffer.info.plane_info[0].size);
-        break;
-      case BufferFormat::kYUY2:
-        size = buffer.info.plane_info[0].stride * buffer.info.plane_info[0].height * 2;
-        break;
-#ifdef ENABLE_H264
-      case BufferFormat::kNV12: {
-        std::shared_ptr<C2Buffer> c2buffer;
-        uint64_t timestamp = buffer.timestamp;
-        uint32_t flags = 0;
-        uint64_t index = buffer.frame_number;
-        std::list<std::unique_ptr<C2Param>> settings;
-
-        c2buffer = ImportGraphicBuffer(buffer);
-        buffMap->insert(index, buffer);
-        if (c2buffer == nullptr)
-          UMD_LOG_ERROR ("Failed to create c2buffer\n");
-        else
-          mC2Module->Queue(c2buffer, settings, index, timestamp, flags);
-        return;
-      }
-#endif
-      default:
-        UMD_LOG_ERROR("Unsupported format %d!\n", buffer.info.format);
-        goto fail_unmap;
-        break;
+    while (mRequest.streamIds.size() > roi_cnt ) {
+      mRequest.streamIds.erase(mRequest.streamIds.begin() + mCameraStreams[--mStreamIdx]);
     }
-    UMD_LATENCY_LOG("UmdCamera-latency: FrameNumber: %d fd: %d Submit " \
-      "buffer to UMD \n", buffer.frame_number, buffer.fd);
-    uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
-        mapped_buffer, size, maxsize, buffer.timestamp);
-    if (bufidx < 0) {
-      goto fail_unmap;
-    }
-    mVideoBufferQueue.push(std::make_pair (buffer, bufidx));
-    return;
   }
 
-fail_unmap:
-  mAllocDeviceInterface->UnmapBuffer(buffer.handle);
+  mMsg.push(UmdCameraMessage::CAMERA_SUBMIT_REQUEST);
+  MemAllocFlags usage;
+  MemAllocError ret;
+  UMD_LATENCY_LOG("UmdCamera-latency: FrameNumber: %d Buffer from HAL\n",
+      buffer.frame_number);
 
-fail_return:
-  mDeviceClient->ReturnStreamBuffer(buffer);
+  auto it = mStreamMap.find(buffer.stream_id);
+  if (it != mStreamMap.end()) {
+    UmdVideoData* found_vdata = it->second.second;
+    found_vdata->processData(buffer);
+  }
+  return;
 }
 
 void UmdCamera::cameraThreadHandler() {
@@ -1326,68 +1181,19 @@ void UmdCamera::cameraThreadHandler() {
   }
 }
 
-void UmdCamera::videoBufferLoop() {
-  while (mActive || mVideoBufferQueue.size()) {
-    std::pair<StreamBuffer, int32_t> buffer_pair;
-    if (!mVideoBufferQueue.pop(buffer_pair)) {
-      StreamBuffer buffer = buffer_pair.first;
-      int32_t bufidx = buffer_pair.second;
-      umd_gadget_wait_buffer (mGadget, UMD_VIDEO_STREAM_ID, bufidx);
-      UMD_LATENCY_LOG ("UmdCamera-latency: FrameNumber: %d fd: %d Return buffer" \
-          " from UMD \n", buffer.frame_number, buffer.fd);
-      if (buffer.handle == nullptr) {
-        UMD_LOG_ERROR("Invalid buffer handle\n");
-        continue;
-      }
-
-      mAllocDeviceInterface->UnmapBuffer(buffer.handle);
-      mDeviceClient->ReturnStreamBuffer(buffer);
-    } else {
-      UMD_LOG_ERROR("Video buffer timeout!\n");
-    }
-  }
-
-  UMD_LOG_INFO("videoBufferLoop terminate!\n");
-}
-
-void UmdCamera::codecVideoBufferLoop() {
-  while (mActive || mCodecVideoBufferQueue.size()) {
-    int32_t bufidx;
-    std::pair<StreamBuffer, int32_t> buffer_pair;
-    if (!mCodecVideoBufferQueue.pop(buffer_pair)) {
-      StreamBuffer buffer = buffer_pair.first;
-      int32_t bufidx = buffer_pair.second;
-      umd_gadget_wait_buffer (mGadget, UMD_VIDEO_STREAM_ID, bufidx);
-      if (buffer.handle == nullptr) {
-        UMD_LOG_ERROR("Invalid buffer handle\n");
-        continue;
-      }
-      mAllocDeviceInterface->UnmapBuffer(buffer.handle);
-      mDeviceClient->ReturnStreamBuffer(buffer);
-    }
-  }
-
-  UMD_LOG_INFO("codecVideoBufferLoop terminate!\n");
-}
-
 bool UmdCamera::CameraStart() {
   UMD_LOG_DEBUG ("Camera start\n");
-  mTv = {0, 0};
-  mPrevtv = {0, 0};
-  mCount = 0;
   const std::lock_guard<std::mutex> lock(mCameraMutex);
 
+  if (mCamStartDone)
+    return true;
+
+  mCamStartDone = true;
+  mCamStopDone = false;
+  mStreamIdx = 0;
   CameraStreamParameters params = {};
   StreamConfiguration config = {};
   config.params = &params;
-
-  mVideoBufferThread = std::unique_ptr<std::thread>(
-      new std::thread(&UmdCamera::videoBufferLoop, this));
-
-  if (nullptr == mVideoBufferThread) {
-    UMD_LOG_ERROR ("Video buffer thread creation failed!\n");
-    return -ENOMEM;
-  }
 
   if (mVsetup.width == 0 || mVsetup.height == 0) {
     UMD_LOG_ERROR ("Invalid stream resolution: %dx%d!\n",
@@ -1417,8 +1223,6 @@ bool UmdCamera::CameraStart() {
     case UMD_VIDEO_FMT_H264:
       params.format = PixelFormat::IMPLEMENTATION_DEFINED;
       params.bufferCount += DCVS_EXTRA_BUFFER_COUNT;
-      if (!InitializeCodec())
-        return false;
       break;
 #endif
     default:
@@ -1437,14 +1241,37 @@ bool UmdCamera::CameraStart() {
   if (hdr)
     params.cam_feature_flags |=  static_cast<uint32_t>(CamFeatureFlag::kHDR);
 
-  mStreamId = mDeviceClient->CreateStream(params);
-  if (mStreamId < 0) {
-    UMD_LOG_ERROR("Camera CreateStream failed!\n");
-    return false;
+  uint32_t numOfCamStreams = 0;
+
+  if (mGadgetCount > 1)
+    numOfCamStreams = 7;
+  else
+    numOfCamStreams = mGadgetCount;
+
+  for (int i = 0; i < numOfCamStreams; i++) {
+    mStreamId = mDeviceClient->CreateStream(params);
+    if (mStreamId < 0) {
+      UMD_LOG_ERROR("Camera CreateStream failed!\n");
+      return false;
+    }
+
+    mCameraStreams.push_back(mStreamId);
+    if (mVsetup.format == UMD_VIDEO_FMT_H264) {
+        mC2Modules.push_back(C2Factory::GetModule(C2_COMPONENT_NAME, C2ModeType::kVideoEncode));
+    } else {
+        mC2Modules.push_back(nullptr);
+    }
+
+
+    mVdata = UmdVideoDataFactory::createUmdVideoInstance(mVsetup,
+        mGadgets[mGadgetItr],mC2Modules[mStreamId], mDeviceClient);
+    mVdata->init();
+
+    // create map of [streamId - mGadget,mVdata]
+    mStreamMap[mStreamId] = std::make_pair(mGadgets[mGadgetItr++], mVdata);
   }
 
-  mRequest.streamIds.push_back(mStreamId);
-
+  mRequest.streamIds.push_back(mCameraStreams[mStreamIdx]);
   ret = mDeviceClient->EndConfigure(config);
   if (0 != ret) {
     UMD_LOG_ERROR ("Camera EndConfigure failed!\n");
@@ -1464,12 +1291,10 @@ bool UmdCamera::CameraStart() {
 bool UmdCamera::CameraStop() {
   UMD_LOG_DEBUG ("Camera stop\n");
 
-  const std::lock_guard<std::mutex> lock(mCameraMutex);
+  if (mCamStopDone)
+    return true;
 
-  if (mVideoBufferThread == nullptr) {
-    UMD_LOG_ERROR ("Video loop thread not started!\n");
-    return -EINVAL;
-  }
+  const std::lock_guard<std::mutex> lock(mCameraMutex);
 
   auto ret = mDeviceClient->CancelRequest(mRequestId, &mLastFrameNumber);
   if (0 != ret) {
@@ -1484,36 +1309,31 @@ bool UmdCamera::CameraStop() {
     UMD_LOG_ERROR ("Camera WaitUntilIdle failed!\n");
   }
 
-  mVideoBufferQueue.abort();
+  while (!mCameraStreams.empty()) {
+    int32_t poppedValue = mCameraStreams.back();
+    mCameraStreams.pop_back();
 
-  mVideoBufferThread->join();
-  mVideoBufferThread = nullptr;
-
-  for (uint32_t i = 0; i < mRequest.streamIds.size(); i++) {
-    ret = mDeviceClient->DeleteStream(mRequest.streamIds[i], false);
+    ret = mDeviceClient->DeleteStream(poppedValue, true);
     if (0 != ret) {
       UMD_LOG_ERROR ("Camera DeleteStream failed!\n");
     }
+
+    auto it = mStreamMap.find(poppedValue);
+    if (it != mStreamMap.end()) {
+      UmdVideoData* found_vdata = it->second.second;
+      found_vdata->deinit();
+    }
   }
+
   mRequest.streamIds.clear();
   mStreamId = -1;
+  mCameraStreams.clear();
+  mStreamMap.clear();
+  mStreamIdx = 0;
+  mCamStartDone = false;
+  mCamStopDone = true;
+  mGadgetItr = 0;
 
-  if (mCodecVideoBufferThread) {
-    mCodecVideoBufferQueue.abort();
-    mCodecVideoBufferThread->join();
-    mCodecVideoBufferThread = nullptr;
-  }
-#ifdef ENABLE_H264
-  // Stop codec2 module
-  if (mC2Module) {
-    mC2Module->Stop();
-    delete mC2Module;
-    mC2Module = nullptr;
-  }
-#endif
-
-  mVideoBufferQueue.reset();
-  mCodecVideoBufferQueue.reset();
   return true;
 }
 
@@ -1557,26 +1377,6 @@ bool UmdCamera::SetCameraMetadataLocked(CameraMetadata &meta, bool doSubmitReq) 
     mMsg.push(UmdCameraMessage::CAMERA_SUBMIT_REQUEST);
   }
   return true;
-}
-
-uint32_t UmdCamera::GetBlobSize(uint8_t *buffer, uint32_t size) {
-  uint32_t bsize = sizeof(struct camera3_jpeg_blob);
-  uint32_t res = size;
-
-  if (size > bsize) {
-    uint8_t *footer = buffer + size - bsize - JPEG_BLOB_OFFSET;
-    struct camera3_jpeg_blob *blob = (struct camera3_jpeg_blob *) footer;
-
-    if (CAMERA3_JPEG_BLOB_ID == blob->jpeg_blob_id) {
-      res = blob->jpeg_size;
-    } else {
-      UMD_LOG_ERROR("%s Invalid blob structure!\n", __func__);
-    }
-  } else {
-    UMD_LOG_ERROR("%s Invalid blob size: %u\n", __func__, bsize);
-  }
-
-  return res;
 }
 
 void UmdCamera::SetDefaultControlValues(CameraMetadata& meta) {
@@ -1673,145 +1473,21 @@ void UmdCamera::FillInitialControlValue() {
   mCtrlValues.pan_tilt_def = UMD_VIDEO_CTRL_SET_PAN_AND_TILT(pan_def, tilt_def);
 }
 
-#ifdef ENABLE_H264
-bool UmdCamera::InitializeCodec() {
-  // Initialize codec2 component
-  mC2Module = C2Factory::GetModule(C2_COMPONENT_NAME, C2ModeType::kVideoEncode);
-  if (nullptr == mC2Module) {
-    UMD_LOG_ERROR ("Failed to create c2module\n");
-    return false;
+uint32_t UmdCamera::GetGadgetCount() {
+  std::string usb_mode;
+  std::smatch match;
+  uint32_t count = 1;
+  std::ifstream file("/config/usb_gadget/g1/configs/b.1/strings/0x409/configuration");
+  if (!file.is_open()) {
+    UMD_LOG_ERROR("Failed to open usb composition file");
+    return -1;
   }
-  buffMap = std::make_unique<UmdBufferMap>();
+  std::getline(file, usb_mode);
+  file.close();
+  std::regex pattern("(\\d+)(?=xuvc)");
 
-  UmdFrameCallback umdFrameCb = [&](uint8_t* data, uint32_t size, uint64_t
-    timestamp, StreamBuffer &buffer) {
+  if (std::regex_search(usb_mode, match, pattern))
+    count = std::stoi(match.str());
 
-    if (mActive) {
-      uint32_t bufidx = umd_gadget_submit_buffer (mGadget, UMD_VIDEO_STREAM_ID,
-          data, size, size, timestamp);
-      PrintFPS();
-      mCodecVideoBufferQueue.push(std::make_pair (buffer, bufidx));
-    } else {
-      mAllocDeviceInterface->UnmapBuffer(buffer.handle);
-      mDeviceClient->ReturnStreamBuffer(buffer);
-    }
-  };
-
-  UmdFrameDropCallback umdFrameDropCb = [&](uint64_t frameNum) {
-    StreamBuffer& buffer = buffMap->find(frameNum);
-    buffMap->erase(frameNum);
-    mAllocDeviceInterface->UnmapBuffer(buffer.handle);
-    mDeviceClient->ReturnStreamBuffer(buffer);
-  };
-
-  std::shared_ptr<IC2Notifier> notifier = std::make_shared<UmdC2Notifier>(
-    umdFrameCb,umdFrameDropCb);
-  mC2Module->Initialize(notifier);
-
-  // Set the encoder parameters
-  SetEncoderParameters();
-
-  // Start c2 component
-  if (mC2Module->Start()) {
-    UMD_LOG_ERROR ("Failed to start c2module\n");
-    delete mC2Module;
-    return false;
-  }
-
-  mCodecVideoBufferThread = std::unique_ptr<std::thread>(
-      new std::thread(&UmdCamera::codecVideoBufferLoop, this));
-
-  if (nullptr == mCodecVideoBufferThread) {
-    UMD_LOG_ERROR ("Codec video buffer thread creation failed!\n");
-    delete mC2Module;
-    return false;
-  }
-
-  return true;
-}
-
-void UmdCamera::SetParams (std::unique_ptr<C2Param> c2param, std::string type) {
-  try {
-    mC2Module->SetParam(c2param);
-    UMD_LOG_INFO ("Successfully set parameter: %s", type.c_str());
-  } catch (std::exception& e) {
-    UMD_LOG_ERROR ("Failed to set c2module parameter, error: '%s'!", e.what());
-  }
-}
-
-void UmdCamera::SetEncoderParameters() {
-  std::unique_ptr<C2Param> c2param;
-
-  // input format
-  C2StreamPixelFormatInfo::input pixformat;
-  pixformat.value = static_cast<uint32_t>(C2PixelFormat::kNV12);
-  SetParams(C2Param::Copy(pixformat), C2_PARAMKEY_PIXEL_FORMAT);
-
-  // input resolution
-  C2StreamPictureSizeInfo::input dimensions;
-  dimensions.width = mVsetup.width;
-  dimensions.height = mVsetup.height;
-  SetParams(C2Param::Copy(dimensions), C2_PARAMKEY_PICTURE_SIZE);
-
-  // output framerate
-  C2StreamFrameRateInfo::output framerate;
-  framerate.value = C2_OUT_FRAMERATE;
-  SetParams(C2Param::Copy(framerate), C2_PARAMKEY_FRAME_RATE);
-
-  // profile level
-  C2StreamProfileLevelInfo::output plinfo;
-  plinfo.profile = C2Config::profile_t::PROFILE_AVC_HIGH;
-  SetParams(C2Param::Copy(plinfo), C2_PARAMKEY_PROFILE_LEVEL);
-
-  // rate control
-  C2StreamBitrateModeTuning::output ratectrl;
-  ratectrl.value = static_cast<C2Config::bitrate_mode_t>
-      (C2Config::BITRATE_VARIABLE);
-  SetParams(C2Param::Copy(ratectrl), C2_PARAMKEY_BITRATE_MODE);
-
-  // bitrate
-  C2StreamBitrateInfo::output bitrate;
-  bitrate.value = C2_BITRATE;
-  SetParams(C2Param::Copy(bitrate), C2_PARAMKEY_BITRATE);
-
-  // gop
-  auto c2gop = C2StreamGopTuning::output::AllocUnique(2, 0u);
-  c2gop->m.values[0] = {P_FRAME, C2_PFRAME_VALUE};
-  c2gop->m.values[1] =
-      {C2Config::picture_type_t(P_FRAME | B_FRAME), C2_BFRAME_VALUE};
-  SetParams(C2Param::Copy(*c2gop), C2_PARAMKEY_GOP);
-
-  // prepend header
-  C2PrependHeaderModeSetting csdmode;
-  csdmode.value = PREPEND_HEADER_TO_ALL_SYNC;
-  SetParams(C2Param::Copy(csdmode), C2_PARAMKEY_PREPEND_HEADER_MODE);
-
-  // intra refresh
-  C2StreamIntraRefreshTuning::output irefresh;
-  irefresh.mode = C2Config::INTRA_REFRESH_DISABLED;
-  irefresh.period = C2_REFRESH_PERIOD;
-  SetParams(C2Param::Copy(irefresh), C2_PARAMKEY_INTRA_REFRESH);
-
-  // set realtime session
-  C2RealTimePriorityTuning priority;
-  priority.value = 0;
-  SetParams(C2Param::Copy(priority), C2_PARAMKEY_PRIORITY);
-
-}
-#endif
-
-void UmdCamera::PrintFPS() {
-  clock_gettime(CLOCK_MONOTONIC, &mTv);
-  uint64_t time_diff = (uint64_t)((mTv.tv_sec * 1000000 + mTv.tv_nsec / 1000) -
-      (mPrevtv.tv_sec * 1000000 + mPrevtv.tv_nsec / 1000));
-  mCount++;
-  if (time_diff >= FPS_TIME_INTERVAL) {
-    bool is_first_time = (mPrevtv.tv_sec == 0 && mPrevtv.tv_nsec == 0);
-    if (!is_first_time) {
-      float framerate = (mCount * 1000000) / (float)time_diff;
-      UMD_LOG_INFO("Encoded FPS = %0.2f", framerate);
-    }
-    mPrevtv = mTv;
-    mCount = 0;
-  }
+  return count;
 }
