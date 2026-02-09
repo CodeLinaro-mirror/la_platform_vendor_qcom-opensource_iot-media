@@ -18,7 +18,6 @@ std::unique_ptr<UmdUtil> umdUtil;
 std::unique_ptr<std::thread> audioThread;
 
 bool audioActive = false;
-const uint32_t SINGLE_GADGET = 1;
 const std::string HOST_DEV = "hw:1,0";
 std::vector<std::unique_ptr<FakeCamera>> fakecamInstances;
 std::vector<std::unique_ptr<UmdCamera>> umdcamInstances;
@@ -27,27 +26,30 @@ void init_uvc() {
   std::string uvc_dev;
   int32_t gadget_cnt;
   uint32_t num_of_cameras;
+  uint32_t filebased_uvc;
   num_of_cameras = Property::Get("persist.vendor.umd.num.cam", 1);
+  filebased_uvc = Property::Get("persist.vendor.umd.file.based", 0);
 
   for (uint32_t i = 0; i < num_of_cameras; i++) {
     uvc_dev = "/dev/video" + std::to_string(i + 2);
     umdcamInstances.push_back(std::unique_ptr<UmdCamera>(new UmdCamera(uvc_dev, i)));
   }
 
+  if (!filebased_uvc)
+    return;
   gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0)
     return;
-  if (gadget_cnt > SINGLE_GADGET) {
-    UMD_LOG_INFO("MultiUVC usecase\n");
-    for (uint32_t i = 0; i < gadget_cnt - num_of_cameras; i++) {
-      uvc_dev = "/dev/video" + std::to_string(num_of_cameras + i + 2);
-      fakecamInstances.push_back(std::unique_ptr<FakeCamera>(new FakeCamera(uvc_dev)));
-    }
+  UMD_LOG_INFO("MultiUVC filebased usecase\n");
+  for (uint32_t i = 0; i < gadget_cnt - num_of_cameras; i++) {
+    uvc_dev = "/dev/video" + std::to_string(num_of_cameras + i + 2);
+    fakecamInstances.push_back(std::unique_ptr<FakeCamera>(new FakeCamera(uvc_dev)));
   }
 }
 
 int32_t start_uvc() {
   int32_t res;
+  auto filebased_uvc = Property::Get("persist.vendor.umd.file.based", 0);
   for (const auto &ptr : umdcamInstances) {
     res = ptr->StartUVC();
     if (res) {
@@ -58,6 +60,8 @@ int32_t start_uvc() {
     }
   }
 
+  if (!filebased_uvc)
+    return 0;
   int32_t gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0) {
     for (const auto &ptr : umdcamInstances)
@@ -65,16 +69,14 @@ int32_t start_uvc() {
     deinit_uvc();
     return -1;
   }
-  if (gadget_cnt > SINGLE_GADGET) {
-    for (const auto &ptr : fakecamInstances) {
-      res = ptr->Init();
-      if (res) {
-        UMD_LOG_ERROR("Start MultiUVC failed\n");
-        for (const auto &ptr : umdcamInstances)
-          ptr->StopUVC();
-        deinit_uvc();
-        return -1;
-      }
+  for (const auto &ptr : fakecamInstances) {
+    res = ptr->Init();
+    if (res) {
+      UMD_LOG_ERROR("Start MultiUVC failed\n");
+      for (const auto &ptr : umdcamInstances)
+        ptr->StopUVC();
+      deinit_uvc();
+      return -1;
     }
   }
 
@@ -84,23 +86,32 @@ int32_t start_uvc() {
 void stop_uvc() {
   for (const auto &ptr : umdcamInstances)
     ptr->StopUVC();
+
+  auto filebased_uvc = Property::Get("persist.vendor.umd.file.based", 0);
+  if (!filebased_uvc)
+    return;
+
   int32_t gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0)
     return;
-  if (gadget_cnt > SINGLE_GADGET) {
-    for (const auto &ptr : fakecamInstances) {
-      ptr->Deinit();
-    }
+
+  for (const auto &ptr : fakecamInstances) {
+    ptr->Deinit();
   }
 }
 
 void deinit_uvc() {
   umdcamInstances.clear();
+
+  auto filebased_uvc = Property::Get("persist.vendor.umd.file.based", 0);
+  if (!filebased_uvc)
+    return;
+
   int32_t gadget_cnt = get_gadget_cnt();
   if (gadget_cnt < 0)
     return;
-  if (gadget_cnt > SINGLE_GADGET)
-    fakecamInstances.clear();
+
+  fakecamInstances.clear();
 }
 
 void deinit_uac() {
