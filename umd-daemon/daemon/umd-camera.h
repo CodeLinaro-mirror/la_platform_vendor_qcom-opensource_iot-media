@@ -27,39 +27,10 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- /*
- # Changes from Qualcomm Innovation Center are provided under the following license :
- # Copyright(c) 2022-2023 Qualcomm Innovation Center, Inc.
- #
- # Redistributionand use in sourceand binary forms, with or without
- # modification, are permitted(subject to the limitations in the
- # disclaimer below) provided that the following conditions are met :
- #
- #    * Redistributions of source code must retain the above copyright
- #      notice, this list of conditionsand the following disclaimer.
- #
- #    * Redistributions in binary form must reproduce the above
- #      copyright notice, this list of conditionsand the following
- #      disclaimer in the documentationand /or other materials provided
- #      with the distribution.
- #
- #    * Neither the name Qualcomm Innovation Center nor the names of its
- #      contributors may be used to endorse or promote products derived
- #      from this software without specific prior written permission.
- #
- # NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
- # GRANTED BY THIS LICENSE.THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
- # HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- # WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- # MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- # IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- # ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- # DAMAGES(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- # GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- # INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- # IN CONTRACT, STRICT LIABILITY, OR TORT(INCLUDING NEGLIGENCE OR
- # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- # IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #pragma once
@@ -79,12 +50,21 @@
 #include "c2-module.h"
 #endif
 
-typedef std::function<void(uint8_t* data, uint32_t size, uint64_t timestamp)>
-  UmdFrameCallback;
+#include "umd-video-data-processing.h"
 
 using namespace ::android;
 using namespace ::camera::adaptor;
 using namespace ::camera;
+
+typedef std::function<void(uint8_t* data, uint32_t size, uint64_t timestamp, StreamBuffer &buffer)>
+  UmdFrameCallback;
+typedef std::function<void(uint64_t frameNumber)>UmdFrameDropCallback;
+
+// Context structure to pass gadget index with callbacks
+struct UmdGadgetContext {
+  class UmdCamera* camera;
+  uint32_t gadgetIndex;
+};
 
 enum
 {
@@ -198,8 +178,6 @@ private:
   int32_t InitializeAudio();
 
   void cameraThreadHandler();
-  void videoBufferLoop();
-  void codecVideoBufferLoop();
 
   int32_t InitializeCamera();
   bool CameraStart();
@@ -213,21 +191,16 @@ private:
   void SetDefaultControlValues(CameraMetadata& meta);
   void FillInitialControlValue();
 
-  uint32_t GetBlobSize(uint8_t *buffer, uint32_t size);
+  uint32_t GetGadgetCount();
+  void SetupVideoDataAndStreamMap();
+  int32_t InitializeGadgets();
+  bool IsSingleCamera() const;
+  bool IsMultipleGadgets() const;
 
-  void SetEncoderParameters();
-  bool InitializeCodec();
-  void OnFrameAvailable(uint8_t* data, uint32_t size, uint64_t timestamp);
-  void PrintFPS();
-#ifdef ENABLE_H264
-  void SetParams (std::unique_ptr<C2Param> c2param, std::string type);
-  std::shared_ptr<C2Buffer> ImportGraphicBuffer(StreamBuffer buffer);
-
-  C2Module *mC2Module;
-#endif
   UmdGadget *mGadget;
   UmdVideoSetup mVsetup;
   UmdVideoCallbacks mUmdVideoCallbacks;
+  UmdVideoData *mVdata;
   std::mutex mGadgetMutex;
   std::string mUvcDev;
   std::string mUacDev;
@@ -239,11 +212,10 @@ private:
 
   int mCameraId;
   int mStreamId;
-  bool mActive;
+  std::atomic<bool> mActive;
   bool mOnlyUAC;
 
   sp<Camera3DeviceClient> mDeviceClient;
-  IAllocDevice* mAllocDeviceInterface;
   CameraMetadata mStaticInfo;
   CameraClientCallbacks mClientCb;
   Camera3Request mRequest;
@@ -253,16 +225,19 @@ private:
 
   std::mutex mCameraMutex;
 
-  MessageQ<std::pair<StreamBuffer, int32_t>> mVideoBufferQueue;
-  MessageQ<int32_t> mCodecVideoBufferQueue;
-  std::unique_ptr<std::thread> mVideoBufferThread;
-  std::unique_ptr<std::thread> mCodecVideoBufferThread;
-
   UVCControlValues mCtrlValues;
   StreamRotation mRotation;
 
-  struct timespec mTv;
-  struct timespec mPrevtv;
-  int64_t mCount;
+  int32_t mStreamIdx;
+  static uint32_t mGadgetItr;
+  uint32_t mCameraStartCount;
+  uint32_t mCurrentGadgetIndex;
+  std::vector<UmdVideoSetup> mSavedVideoSetups;
+  std::vector<int> mCameraStreams;
+  std::vector<UmdGadget *> mGadgets;
+  std::vector<UmdGadgetContext*> mGadgetContexts;
+  std::vector<C2Module *> mC2Modules;
+  uint32_t mGadgetCount;
+  uint32_t mNumOfCameras;
+  std::unordered_map<int, std::pair<UmdGadget *, UmdVideoData *>> mStreamMap;
 };
-

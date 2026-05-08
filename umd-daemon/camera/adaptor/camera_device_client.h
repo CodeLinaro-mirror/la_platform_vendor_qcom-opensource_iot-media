@@ -201,7 +201,7 @@ class Camera3DeviceClient : public ICameraDeviceCallback {
 
   CameraMetadata request_templates_[CAMERA_TEMPLATE_COUNT];
   static const int32_t JPEG_BUFFER_SIZE_MIN =
-      256 * 1024 + 6 /*sizeof(camera3_jpeg_blob)*/;
+      256 * 1024 + 8 /*sizeof(camera3_jpeg_blob)*/;
 
   sp<ICameraProvider> camera_provider_;
   sp<ICameraDevice> camera_device_;
