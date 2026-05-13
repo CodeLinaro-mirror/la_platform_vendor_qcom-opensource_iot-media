@@ -192,8 +192,15 @@ int32_t Camera3DeviceClient::Initialize() {
         goto exit;
       }
 
+#ifdef USE_AIDL_DESC
+      CAMERA_INFO("%s: Using AIDL descriptor", __func__);
+      res = CustomVendorTagDescriptor::createDescriptorFromAidl(
+          vt_sections, vendor_tag_desc_);
+#else
+      CAMERA_INFO("%s: Using HIDL descriptor", __func__);
       res = CustomVendorTagDescriptor::createDescriptorFromHidl(
           vt_sections, vendor_tag_desc_);
+#endif
 
       if (0 != res) {
         CAMERA_ERROR("%s: Could not generate descriptor from HIDL,"

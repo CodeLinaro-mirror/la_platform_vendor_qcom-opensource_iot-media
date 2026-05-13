@@ -197,6 +197,8 @@ void UmdAudio::AudioThreadHandler() {
 int32_t UmdAudio::SubmitBuffer(uint8_t *data) {
   AudioBuffer *buffer = nullptr;
   const std::lock_guard<std::mutex> lock(mMutex);
+#ifndef USE_PCM_WRITE
+  UMD_LOG_INFO("SubmitBuffer for HIDL");
   int32_t res = mAudioStream->GetBuffer(&buffer);
   if (res) {
     UMD_LOG_ERROR("Audio stream get buffer failed.\n");
@@ -205,6 +207,10 @@ int32_t UmdAudio::SubmitBuffer(uint8_t *data) {
   memcpy(buffer->data, data, mBufSize);
   buffer->size = mBufSize;
   mAudioStream->SubmitBuffer(buffer);
+#else
+  UMD_LOG_INFO("SubmitBuffer for AIDL");
+  mPcmNode->Write(data, mBufSize);
+#endif
   return 0;
 }
 

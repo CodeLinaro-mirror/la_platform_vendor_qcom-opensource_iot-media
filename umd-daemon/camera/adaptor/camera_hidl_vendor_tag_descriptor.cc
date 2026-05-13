@@ -15,41 +15,8 @@
  */
 
 /*
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted (subject to the limitations
- * in the disclaimer below) provided that the following conditions are met:
- *
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above
- *      copyright notice, this list of conditions and the following
- *      disclaimer in the documentation and/or other materials provided
- *      with the distribution.
- *    * Neither the name of Qualcomm Innovation Center, Inc.
- *      nor the names of its contributors may be used to endorse
- *      or promote products derived from this software without specific
- *      prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED
- * BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS
- * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
- * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
- * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-/*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -139,6 +106,109 @@ status_t CustomVendorTagDescriptor::createDescriptorFromHidl(
         }
         desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
     }
+
+    descriptor = std::move(desc);
+    return OK;
+}
+
+status_t CustomVendorTagDescriptor::createDescriptorFromAidl(
+    const std::vector<VendorTagSection>& vts,
+    android::sp<VendorTagDescriptor>& descriptor) {
+
+    int tagCount = 0;
+    for (size_t s = 0; s < vts.size(); s++) {
+        tagCount += static_cast<int>(vts[s].tags.size());
+    }
+    if (tagCount < 0 || tagCount > INT32_MAX) {
+        CAMERA_ERROR("%s: tag count %d from vendor tag sections is invalid.",
+                     __func__, tagCount);
+        return BAD_VALUE;
+    }
+
+    CAMERA_DEBUG("%s: Total vendor tags reported by provider = %d", __func__, tagCount);
+
+    std::vector<uint32_t> tagArray(static_cast<size_t>(tagCount));
+
+    android::sp<CustomVendorTagDescriptor> desc = new CustomVendorTagDescriptor();
+    if (desc == nullptr) return NO_MEMORY;
+    desc->mTagCount = tagCount;
+
+    SortedVector<String8> sections;
+    KeyedVector<uint32_t, String8> tagToSectionMap;
+    CAMERA_DEBUG("%s: Building VendorTagDesc from AIDL vendor sections (count=%zu)",
+        __func__, vts.size());
+    int idx = 0;
+    for (size_t s = 0; s < vts.size(); s++) {
+        const VendorTagSection& section = vts[s];
+
+        const char* sectionName = section.sectionName.c_str();
+        if (sectionName == nullptr) {
+            CAMERA_ERROR("%s: no section name defined for vendor tag section %zu.",
+                         __func__, s);
+            return BAD_VALUE;
+        }
+        String8 sectionString(sectionName);
+        sections.add(sectionString);
+
+        CAMERA_DEBUG("%s:Sc[%zu]: \"%s\" (tgs=%zu)",__func__, s, sectionName, section.tags.size());
+
+        for (size_t j = 0; j < section.tags.size(); j++) {
+            uint32_t tag = static_cast<uint32_t>(section.tags[j].tagId);
+            if (tag < CAMERA_METADATA_VENDOR_TAG_BOUNDARY) {
+                CAMERA_ERROR("%s: vendor tag %u not in vendor tag section.", __func__, tag);
+                return BAD_VALUE;
+            }
+            tagArray[idx++] = tag;
+
+            const char* tagName = section.tags[j].tagName.c_str();
+            if (tagName == nullptr) {
+                CAMERA_ERROR("%s: no tag name defined for vendor tag %u.", __func__, tag);
+                return BAD_VALUE;
+            }
+            desc->mTagToNameMap.add(tag, String8(tagName));
+            tagToSectionMap.add(tag, sectionString);
+
+            int tagType = static_cast<int>(section.tags[j].tagType);
+            if (tagType < 0) {
+                CAMERA_ERROR("%s: tag type %d from vendor ops does not exist.",
+                             __func__, tagType);
+                return BAD_VALUE;
+            }
+            desc->mTagToTypeMap.insert(std::make_pair(tag, tagType));
+
+            CAMERA_DEBUG("%s:• Tag[%zu]: id=%u (0x%08x)  name=\"%s\"  type=%d",__func__, j, tag,
+                tag, tagName, tagType);
+        }
+    }
+
+    desc->mSections = sections;
+
+    for (size_t i = 0; i < tagArray.size(); ++i) {
+        uint32_t tag = tagArray[i];
+        String8 sectionString = tagToSectionMap.valueFor(tag);
+
+        ssize_t index = sections.indexOf(sectionString);
+        LOG_ALWAYS_FATAL_IF(index < 0, "index %zd must be non-negative", index);
+        if (index < 0) {
+            CAMERA_ERROR("%s: index %zd must be non-negative", __func__, index);
+            return BAD_VALUE;
+        }
+        desc->mTagToSectionMap.add(tag, static_cast<uint32_t>(index));
+
+        ssize_t reverseIndex = desc->mReverseMapping.indexOfKey(sectionString);
+        if (reverseIndex < 0) {
+            auto* nameMapper = new KeyedVector<String8, uint32_t>();
+            reverseIndex = desc->mReverseMapping.add(sectionString, nameMapper);
+        }
+        desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
+
+        CAMERA_DEBUG("%s:sectionIndex(\"%s\") = %zd  (tag id=%u, name=\"%s\")", __func__,
+            sectionString.string(), index, tag, desc->mTagToNameMap.valueFor(tag).string());
+
+    }
+
+    CAMERA_DEBUG("%s: VendorTagDescriptor (AIDL) build complete. sections=%zu, tags=%zu", __func__,
+        sections.size(), tagArray.size());
 
     descriptor = std::move(desc);
     return OK;
