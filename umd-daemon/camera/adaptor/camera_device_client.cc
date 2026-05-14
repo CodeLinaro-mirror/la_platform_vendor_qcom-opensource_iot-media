@@ -161,7 +161,7 @@ int32_t Camera3DeviceClient::Initialize() {
     ABinderProcess_startThreadPool();
 
     std::string serviceDescriptor = std::string() + ICameraProvider::descriptor + "/vendor_qti/0";
-    ndk::SpAIBinder cameraProviderBinder = SpAIBinder(AServiceManager_getService(serviceDescriptor.c_str()));
+    ndk::SpAIBinder cameraProviderBinder = SpAIBinder(AServiceManager_waitForService(serviceDescriptor.c_str()));
     if(cameraProviderBinder.get() == nullptr){
       CAMERA_ERROR("%s: Failed to get camera provider service \n",__func__);
     }
@@ -1879,7 +1879,7 @@ void Camera3DeviceClient::SetErrorStateLocked(const char *fmt, ...) {
 
 void Camera3DeviceClient::SetErrorStateLockedV(const char *fmt, va_list args) {
   String8 errorCause = String8::formatV(fmt, args);
-  CAMERA_ERROR("%s: Camera %d: %s\n", __func__, id_, errorCause.string());
+  CAMERA_ERROR("%s: Camera %d: %s\n", __func__, id_, errorCause.c_str());
 
   if (state_ == STATE_ERROR || state_ == STATE_NOT_INITIALIZED ||
       state_ == STATE_CLOSED)

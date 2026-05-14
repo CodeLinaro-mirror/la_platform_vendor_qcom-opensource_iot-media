@@ -28,8 +28,8 @@
  */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -37,14 +37,18 @@
 
 #include <unordered_map>
 
+#ifndef USE_AIDL_ALLOCATOR
 #include <android/hardware/graphics/allocator/4.0/IAllocator.h>
 #include <android/hardware/graphics/mapper/4.0/IMapper.h>
 #include <android/hardware/graphics/mapper/4.0/types.h>
+#endif
 
 #include "camera_defs.h"
 
+#ifndef USE_AIDL_ALLOCATOR
 using ::android::hardware::hidl_handle;
 using namespace ::android::hardware::graphics;
+#endif
 
 /** MemAllocError
 * @Fail - error while memory allocator operation

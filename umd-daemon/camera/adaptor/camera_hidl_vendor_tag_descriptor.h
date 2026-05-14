@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <VendorTagDescriptor.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <aidl/android/hardware/camera/common/VendorTagSection.h>

@@ -1,5 +1,9 @@
 LOCAL_PATH := $(call my-dir)
 
+ifeq ($(TARGET_BOARD_PLATFORM), sun)
+USE_AIDL_ALLOCATOR := true
+endif
+
 include $(CLEAR_VARS)
 
 LOCAL_MODULE = libcamera_adaptor
@@ -12,6 +16,10 @@ LEGACY_HIDL_LEVELS := 26 27 28 29 30 31 32 33
 
 ifeq ($(filter $(BOARD_SHIPPING_API_LEVEL),$(LEGACY_HIDL_LEVELS)),)
 LOCAL_CPPFLAGS += -DUSE_AIDL_DESC
+endif
+
+ifdef USE_AIDL_ALLOCATOR
+LOCAL_CPPFLAGS += -DUSE_AIDL_ALLOCATOR
 endif
 
 LOCAL_CPP_EXTENSION := .cc
@@ -34,7 +42,6 @@ LOCAL_EXPORT_C_INCLUDE_DIRS += $(LOCAL_PATH)/../include
 LOCAL_SHARED_LIBRARIES := \
     libhidlbase \
     libbinder_ndk \
-    libhwbinder \
     libui \
     libbinder \
     libutils \
@@ -43,17 +50,25 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libc++ \
     libhidlmemory \
-    libgralloctypes \
     libcamera_metadata \
     android.hardware.camera.provider-V1-ndk \
     android.hardware.camera.common@1.0 \
     android.hardware.camera.device-V1-ndk \
     android.hardware.camera.metadata-V1-ndk \
-    android.hardware.graphics.common@1.0 \
-    android.hardware.graphics.allocator@4.0 \
-    android.hardware.graphics.mapper@4.0 \
     libcamera_utils \
     libcamera_memory_interface
+
+ifdef USE_AIDL_ALLOCATOR
+LOCAL_SHARED_LIBRARIES += \
+    android.hardware.graphics.common-V5-ndk
+else
+LOCAL_SHARED_LIBRARIES += \
+    libhwbinder \
+    libgralloctypes \
+    android.hardware.graphics.common@1.0 \
+    android.hardware.graphics.allocator@4.0 \
+    android.hardware.graphics.mapper@4.0
+endif
 
 LOCAL_STATIC_LIBRARIES := \
     android.hardware.camera.common@1.0-helper \

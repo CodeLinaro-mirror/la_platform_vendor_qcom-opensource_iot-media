@@ -20,8 +20,8 @@
  */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -34,6 +34,13 @@
 #include "utils/camera_common_utils.h"
 
 using namespace android;
+
+#ifdef USE_AIDL_ALLOCATOR
+#define DEFAULT_DATASPACE Dataspace::UNKNOWN
+#else
+#define DEFAULT_DATASPACE static_cast<Dataspace>(\
+    ::android::hardware::graphics::common::V1_0::Dataspace::UNKNOWN)
+#endif
 
 namespace camera {
 
@@ -67,8 +74,7 @@ struct CameraStreamParameters {
   uint32_t cam_feature_flags;
   CameraStreamParameters() :
         width(0), height(0),
-        data_space(static_cast<Dataspace>
-          (::android::hardware::graphics::common::V1_0::Dataspace::UNKNOWN)),
+        data_space(DEFAULT_DATASPACE),
         rotation(StreamRotation::ROTATION_0),
         allocFlags(), bufferCount(0), cb(nullptr),
         cam_feature_flags(static_cast<uint32_t>(CamFeatureFlag::kNone)) {}

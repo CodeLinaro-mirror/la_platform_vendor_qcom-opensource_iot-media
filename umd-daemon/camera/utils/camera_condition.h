@@ -27,12 +27,19 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #pragma once
 
 #include <cstdint>
 #include <cerrno>
 #include <cassert>
 #include <chrono>
+#include <condition_variable>
 #include <mutex>
 
 namespace camera {
@@ -227,6 +234,76 @@ class QCondition {
     // Check the timeout condition based on the given unknown clock.
     return (_Clock::now() < tp) ? 0 : -ETIMEDOUT;
   }
+};
+
+#else // fallback: use std::condition_variable (C++11)
+
+/**
+ * Fallback QCondition implementation using std::condition_variable.
+ * Used when platform-specific gthread/libcpp threading macros are unavailable.
+ */
+class QCondition {
+  typedef std::chrono::system_clock system_clock_t;
+  typedef std::chrono::steady_clock steady_clock_t;
+
+ public:
+  QCondition() noexcept = default;
+  ~QCondition() noexcept = default;
+
+  QCondition(const QCondition&) = delete;
+  QCondition& operator=(const QCondition&) = delete;
+
+  void Signal() {
+    cond_.notify_one();
+  }
+
+  void SignalAll() {
+    cond_.notify_all();
+  }
+
+  void Wait(std::unique_lock<std::mutex>& lock) {
+    cond_.wait(lock);
+  }
+
+  template<typename _Predicate>
+  void Wait(std::unique_lock<std::mutex>& lock, _Predicate p) {
+    cond_.wait(lock, std::move(p));
+  }
+
+  template<typename _Clock, typename _Duration>
+  int32_t WaitUntil(std::unique_lock<std::mutex>& lock,
+                    const std::chrono::time_point<_Clock, _Duration>& tp) {
+    auto result = cond_.wait_until(lock, tp);
+    return (result == std::cv_status::timeout) ? -ETIMEDOUT : 0;
+  }
+
+  template<typename _Clock, typename _Duration, typename _Predicate>
+  int32_t WaitUntil(std::unique_lock<std::mutex>& lock,
+                    const std::chrono::time_point<_Clock, _Duration>& tp,
+                    _Predicate p) {
+    while (!p()) {
+      if (WaitUntil(lock, tp) == -ETIMEDOUT) {
+        return -ETIMEDOUT;
+      }
+    }
+    return 0;
+  }
+
+  template<typename _Rep, typename _Period>
+  int32_t WaitFor(std::unique_lock<std::mutex>& lock,
+                  const std::chrono::duration<_Rep, _Period>& timeout) {
+    return WaitUntil(lock, steady_clock_t::now() + timeout);
+  }
+
+  template<typename _Rep, typename _Period, typename _Predicate>
+  int32_t WaitFor(std::unique_lock<std::mutex>& lock,
+                  const std::chrono::duration<_Rep, _Period>& timeout,
+                  _Predicate p) {
+    return WaitUntil(lock, steady_clock_t::now() + timeout, std::move(p));
+  }
+
+ private:
+  std::condition_variable cond_;
 };
 
 #endif // (_GLIBCXX_HAS_GTHREADS && _GLIBCXX_USE_C99_STDINT_TR1) || (_LIBCPP_THREADING_SUPPORT)

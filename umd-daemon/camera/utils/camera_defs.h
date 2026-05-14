@@ -28,8 +28,8 @@
  */
 
 /*
- * ​​​​​Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -51,9 +51,11 @@
 #include <hidl/HidlSupport.h>
 #include <aidl/android/hardware/graphics/common/BufferUsage.h>
 #include <aidl/android/hardware/graphics/common/PixelFormat.h>
+#ifndef USE_AIDL_ALLOCATOR
 #include <android/hardware/graphics/allocator/4.0/IAllocator.h>
 #include <android/hardware/graphics/mapper/4.0/IMapper.h>
 #include <android/hardware/graphics/mapper/4.0/types.h>
+#endif
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/camera/device/BnCameraDeviceCallback.h>
 
