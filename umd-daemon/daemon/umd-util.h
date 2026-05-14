@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+
 #pragma once
 
 #include <cutils/properties.h>
@@ -11,9 +12,11 @@
 #include <sys/select.h>
 #include <unistd.h>
 
+#include <functional>
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 enum AudioState {
   AUDIO_STATE_INVALID,

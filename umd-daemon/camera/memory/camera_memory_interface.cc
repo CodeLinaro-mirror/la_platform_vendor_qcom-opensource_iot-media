@@ -27,8 +27,17 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 
+#ifdef USE_AIDL_ALLOCATOR
+#include "allocator_aidl_interface.h"
+#else
 #include "allocator_hidl_interface.h"
+#endif
 
 #include "camera_memory_interface.h"
 #include "utils/camera_log.h"
@@ -50,7 +59,17 @@ const int IMemAllocUsage::kHwCameraRead     = (1 << 13);
 const int IMemAllocUsage::kHwCameraWrite    = (1 << 14);
 
 IAllocDevice *AllocDeviceFactory::CreateAllocDevice() {
+#ifdef USE_AIDL_ALLOCATOR
+  AidlAllocDevice *device = new AidlAllocDevice;
+  if (!device->IsValid()) {
+    CAMERA_ERROR("%s: Failed to create AIDL alloc device\n", __func__);
+    delete device;
+    return nullptr;
+  }
+  return device;
+#else
   return new HidlAllocDevice;
+#endif
 }
 
 void AllocDeviceFactory::DestroyAllocDevice(IAllocDevice* alloc_device_interface) {
@@ -58,13 +77,20 @@ void AllocDeviceFactory::DestroyAllocDevice(IAllocDevice* alloc_device_interface
 }
 
 const IMemAllocUsage &AllocUsageFactory::GetAllocUsage() {
+#ifdef USE_AIDL_ALLOCATOR
+  static const AidlAllocUsage x = AidlAllocUsage();
+#else
   static const HidlAllocUsage x = HidlAllocUsage();
+#endif
   return x;
 }
 
-
 buffer_handle_t &GetAllocBufferHandle(const IBufferHandle &handle) {
+#ifdef USE_AIDL_ALLOCATOR
+  AidlAllocBuffer *b = static_cast<AidlAllocBuffer *>(handle);
+#else
   HidlAllocBuffer *b = static_cast<HidlAllocBuffer *>(handle);
+#endif
   assert(b != nullptr);
   return b->GetNativeHandle();
 }

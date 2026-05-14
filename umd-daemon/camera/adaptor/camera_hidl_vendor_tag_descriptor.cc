@@ -203,7 +203,7 @@ status_t CustomVendorTagDescriptor::createDescriptorFromAidl(
         desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
 
         CAMERA_DEBUG("%s:sectionIndex(\"%s\") = %zd  (tag id=%u, name=\"%s\")", __func__,
-            sectionString.string(), index, tag, desc->mTagToNameMap.valueFor(tag).string());
+            sectionString.c_str(), index, tag, desc->mTagToNameMap.valueFor(tag).c_str());
 
     }
 
