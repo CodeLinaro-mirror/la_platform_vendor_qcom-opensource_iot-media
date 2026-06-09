@@ -18,6 +18,10 @@ ifeq ($(TARGET_BOARD_PLATFORM),sun)
 LOCAL_CFLAGS += -DTARGET_SUN
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM),lahaina612)
+LOCAL_CFLAGS += -DTARGET_LAHAINA
+endif
+
 LEGACY_HIDL_LEVELS := 26 27 28 29 30 31 32 33
 
 ifeq ($(filter $(BOARD_SHIPPING_API_LEVEL),$(LEGACY_HIDL_LEVELS)),)
@@ -55,11 +59,15 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.graphics.mapper@4.0 \
     android.hardware.graphics.common@1.0 \
     android.hardware.graphics.bufferqueue@2.0 \
-    vendor.qti.hardware.umd@1.0 \
     libqtiumd \
     libcamera_adaptor \
     libcamera_memory_interface \
     libcamera_utils
+
+# Only include HIDL dependency for legacy API levels
+ifneq ($(filter $(BOARD_SHIPPING_API_LEVEL),$(LEGACY_HIDL_LEVELS)),)
+LOCAL_SHARED_LIBRARIES += vendor.qti.hardware.umd@1.0
+endif
 
 LOCAL_STATIC_LIBRARIES := \
     android.hardware.camera.common@1.0-helper \

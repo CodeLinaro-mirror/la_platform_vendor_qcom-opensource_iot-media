@@ -4,6 +4,14 @@ include $(CLEAR_VARS)
 
 LOCAL_CPP_EXTENSION := .cc
 
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM), sun lahaina lahaina612))
+USE_AIDL_ALLOCATOR := true
+endif
+
+ifdef USE_AIDL_ALLOCATOR
+LOCAL_CFLAGS += -DUSE_AIDL_ALLOCATOR
+endif
+
 LOCAL_SRC_FILES := camera_condition.cc
 LOCAL_SRC_FILES += camera_thread.cc
 

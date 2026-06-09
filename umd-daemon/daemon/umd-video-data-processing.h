@@ -53,14 +53,13 @@ public:
     }
   }
 
-  StreamBuffer& find(int key) {
-    StreamBuffer buffer;
+  StreamBuffer* find(int key) {
     std::lock_guard<std::mutex> guard(mapMutex);
     auto it = bufferMap.find(key);
     if (it != bufferMap.end()) {
-      return it->second;
+      return &(it->second);
     }
-    return buffer;
+    return nullptr;
   }
 };
 
