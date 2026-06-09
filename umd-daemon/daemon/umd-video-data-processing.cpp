@@ -63,8 +63,13 @@ class UmdC2Notifier : public IC2Notifier {
                       uint64_t timestamp, C2FrameData::flags_t flags) override {
     const C2ConstLinearBlock block = c2buffer->data().linearBlocks().front();
     const C2ReadView view = block.map().get();
-    mFrameCb((uint8_t*)view.data(), block.size(), timestamp, buffMap->find(index));
-    buffMap->erase(index);
+    StreamBuffer* buffer = buffMap->find(index);
+    if (buffer != nullptr) {
+      mFrameCb((uint8_t*)view.data(), block.size(), timestamp, *buffer);
+      buffMap->erase(index);
+    } else {
+      UMD_LOG_ERROR("Buffer not found for index %llu", (unsigned long long)index);
+    }
   }
 
  private:
@@ -187,10 +192,14 @@ private:
   };
 
   UmdFrameDropCallback umdFrameDropCb = [&](uint64_t frameNum) {
-    StreamBuffer& buffer = buffMap->find(frameNum);
-    buffMap->erase(frameNum);
-    mAllocDeviceInterface->UnmapBuffer(buffer.handle);
-    mDeviceClient->ReturnStreamBuffer(buffer);
+    StreamBuffer* buffer = buffMap->find(frameNum);
+    if (buffer != nullptr) {
+      buffMap->erase(frameNum);
+      mAllocDeviceInterface->UnmapBuffer(buffer->handle);
+      mDeviceClient->ReturnStreamBuffer(*buffer);
+    } else {
+      UMD_LOG_ERROR("Buffer not found for frame %llu", (unsigned long long)frameNum);
+    }
   };
 
     std::shared_ptr<IC2Notifier> notifier = std::make_shared<UmdC2Notifier>(

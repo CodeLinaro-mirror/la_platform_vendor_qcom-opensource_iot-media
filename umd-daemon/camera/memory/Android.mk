@@ -1,14 +1,14 @@
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(TARGET_BOARD_PLATFORM), sun)
-USE_AIDL_ALLOCATOR := true
-endif
-
 include $(CLEAR_VARS)
 
 LOCAL_CPP_EXTENSION := .cc
 
 LOCAL_SRC_FILES := camera_memory_interface.cc
+
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM), sun lahaina lahaina612))
+USE_AIDL_ALLOCATOR := true
+endif
 
 ifdef USE_AIDL_ALLOCATOR
 LOCAL_SRC_FILES += allocator_aidl_interface.cc
