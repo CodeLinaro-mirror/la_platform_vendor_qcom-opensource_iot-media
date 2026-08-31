@@ -14,6 +14,12 @@ ifeq ($(TARGET_BOARD_PLATFORM),lahaina)
 LOCAL_CFLAGS += -DTARGET_LAHAINA
 endif
 
+LEGACY_HIDL_LEVELS := 26 27 28 29 30 31 32 33
+
+ifeq ($(filter $(BOARD_SHIPPING_API_LEVEL),$(LEGACY_HIDL_LEVELS)),)
+LOCAL_CPPFLAGS += -DUSE_PCM_WRITE
+endif
+
 LOCAL_SRC_FILES := umd-camera.cpp \
                    umd-fake-camera.cpp \
                    audio-stream.cpp \

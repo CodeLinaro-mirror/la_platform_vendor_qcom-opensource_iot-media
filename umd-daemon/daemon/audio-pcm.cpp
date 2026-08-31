@@ -72,12 +72,22 @@ int PcmNode::Read(AudioBuffer *buffer) {
   return res;
 }
 
+#ifndef USE_PCM_WRITE
 int PcmNode::Write(AudioBuffer *buffer) {
   int res = pcm_write(mPcm, buffer->data, buffer->size);
   if (res < 0)
     UMD_LOG_ERROR("pcm_write fail: %s\n", pcm_get_error(mPcm));
   return res;
 }
+#else
+int PcmNode::Write(uint8_t* data, int32_t size) {
+  UMD_LOG_INFO("PCM Write for AIDL");
+  int res = pcm_write(mPcm, data, size);
+  if (res < 0)
+    UMD_LOG_ERROR("pcm_write fail: %s\n", pcm_get_error(mPcm));
+  return res;
+}
+#endif
 
 int PcmNode::IsReady() {
   return pcm_is_ready(mPcm);
