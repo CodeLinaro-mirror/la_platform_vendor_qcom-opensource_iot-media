@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(TARGET_BOARD_PLATFORM), sun)
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM), sun lahaina lahaina612))
 USE_AIDL_ALLOCATOR := true
 endif
 
