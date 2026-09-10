@@ -50,6 +50,7 @@
 #define C2_COMPONENT_NAME "c2.qti.avc.encoder"
 #define C2_RATE_CTRL_DISABLE 0x7F000000
 #define C2_BITRATE 10000000
+#define DEFAULT_JPEG_QUALITY_VALUE 70
 #define UMD_VIDEO_CTRL_GET_PAN(X)    (((int32_t *)(&(X)))[0] / 3600)
 #define UMD_VIDEO_CTRL_GET_TILT(X)   (((int32_t *)(&(X)))[1] / 3600)
 #define UMD_VIDEO_CTRL_SET_PAN_AND_TILT(P, T) \
@@ -214,6 +215,8 @@ int32_t UmdCamera::InitializeCamera() {
     UMD_LOG_ERROR("Camera CreateDefaultRequest failed!\n");
     return ret;
   }
+
+  mRequest.metadata.update(ANDROID_JPEG_QUALITY, &DEFAULT_JPEG_QUALITY_VALUE, 1);
 
   FillInitialControlValue();
 
