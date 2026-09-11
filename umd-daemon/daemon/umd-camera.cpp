@@ -216,7 +216,8 @@ int32_t UmdCamera::InitializeCamera() {
     return ret;
   }
 
-  mRequest.metadata.update(ANDROID_JPEG_QUALITY, &DEFAULT_JPEG_QUALITY_VALUE, 1);
+  uint8_t jpeg_quality = DEFAULT_JPEG_QUALITY_VALUE;
+  mRequest.metadata.update(ANDROID_JPEG_QUALITY, &jpeg_quality, 1);
 
   FillInitialControlValue();
 
