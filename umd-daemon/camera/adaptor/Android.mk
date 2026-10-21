@@ -45,7 +45,7 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.camera.common@1.0 \
     android.hardware.graphics.common@1.0
 
-ifeq ($(call is-board-platform-in-list, kalama),true)
+ifeq ($(call is-board-platform-in-list, bengal),true)
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.allocator@4.0
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.mapper@4.0
 LOCAL_CPPFLAGS += -DALLOCATOR_IMAPPER_V4
