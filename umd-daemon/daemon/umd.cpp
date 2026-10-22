@@ -29,9 +29,10 @@ void init_uvc() {
   uint32_t filebased_uvc;
   num_of_cameras = Property::Get("persist.vendor.umd.num.cam", 1);
   filebased_uvc = Property::Get("persist.vendor.umd.file.based", 0);
+  uint32_t video_dev_base = Property::Get("persist.vendor.umd.video.dev.base", 2);
 
   for (uint32_t i = 0; i < num_of_cameras; i++) {
-    uvc_dev = "/dev/video" + std::to_string(i + 2);
+    uvc_dev = "/dev/video" + std::to_string(i + video_dev_base);
     umdcamInstances.push_back(std::unique_ptr<UmdCamera>(new UmdCamera(uvc_dev, i)));
   }
 
@@ -42,7 +43,7 @@ void init_uvc() {
     return;
   UMD_LOG_INFO("MultiUVC filebased usecase\n");
   for (uint32_t i = 0; i < gadget_cnt - num_of_cameras; i++) {
-    uvc_dev = "/dev/video" + std::to_string(num_of_cameras + i + 2);
+    uvc_dev = "/dev/video" + std::to_string(num_of_cameras + i + video_dev_base);
     fakecamInstances.push_back(std::unique_ptr<FakeCamera>(new FakeCamera(uvc_dev)));
   }
 }
