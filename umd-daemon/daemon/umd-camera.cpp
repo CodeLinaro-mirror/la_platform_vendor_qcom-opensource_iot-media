@@ -1455,8 +1455,9 @@ int32_t UmdCamera::InitializeGadgets() {
   mSavedVideoSetups.resize(mGadgetCount);
 
   for (int32_t i = 0; i < mGadgetCount; i++) {
+    uint32_t video_dev_base = Property::Get("persist.vendor.umd.video.dev.base", 2);
     std::string devicePathStr = useCustomDevice ? mUvcDev :
-        ("/dev/video" + std::to_string(i + 2));
+        ("/dev/video" + std::to_string(i + video_dev_base));
     const char* devicePath = devicePathStr.c_str();
 
     // Create context with gadget index
